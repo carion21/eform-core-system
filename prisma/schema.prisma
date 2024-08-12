@@ -1,0 +1,187 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Profile {
+  id             Int              @id @default(autoincrement())
+  code           String           @db.VarChar(255)
+  label          String           @db.VarChar(255)
+  value          String           @db.VarChar(255)
+  description    String           @db.Text
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  User           User[]
+  FormPermission FormPermission[]
+}
+
+model User {
+  id               Int                @id @default(autoincrement())
+  code             String             @db.VarChar(255)
+  lastname         String             @db.VarChar(255)
+  firstname        String             @db.VarChar(255)
+  email            String             @unique @db.VarChar(255)
+  phone            String?            @db.VarChar(255)
+  password         String             @db.Text
+  isActive         Boolean            @default(true)
+  isDeleted        Boolean            @default(false)
+  profilePicture   String?            @db.Text
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?          @db.DateTime
+  profileId        Int
+  profile          Profile            @relation(fields: [profileId], references: [id])
+  UserLoginHistory UserLoginHistory[]
+  UserLog          UserLog[]
+  TeamUser         TeamUser[]
+  DataRow          DataRow[]
+}
+
+model UserLoginHistory {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  loginDate DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id])
+}
+
+model UserLog {
+  id     Int      @id @default(autoincrement())
+  userId Int
+  makeBy Int
+  action String   @db.VarChar(255)
+  date   DateTime @default(now())
+  User   User     @relation(fields: [userId], references: [id])
+}
+
+model Team {
+  id          Int           @id @default(autoincrement())
+  code        String        @db.VarChar(255)
+  name        String        @db.VarChar(255)
+  isActive    Boolean       @default(true)
+  isDeleted   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?     @db.DateTime
+  TeamUser    TeamUser[]
+  ProjectTeam ProjectTeam[]
+}
+
+model TeamUser {
+  id        Int      @id @default(autoincrement())
+  teamId    Int
+  userId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Team      Team     @relation(fields: [teamId], references: [id])
+  User      User     @relation(fields: [userId], references: [id])
+}
+
+model Project {
+  id             Int           @id @default(autoincrement())
+  code           String        @db.VarChar(255)
+  name           String        @db.VarChar(255)
+  description    String        @db.Text
+  duplicatedFrom Int?
+  isActive       Boolean       @default(true)
+  isDeleted      Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?     @db.DateTime
+  ProjectTeam    ProjectTeam[]
+  Form           Form[]
+}
+
+model ProjectTeam {
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  teamId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id])
+  team      Team     @relation(fields: [teamId], references: [id])
+}
+
+model Form {
+  id             Int              @id @default(autoincrement())
+  projectId      Int?
+  code           String           @db.VarChar(255)
+  name           String           @db.VarChar(255)
+  description    String           @db.Text
+  uuid           String           @db.VarChar(255)
+  isActive       Boolean          @default(true)
+  isDeleted      Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  deletedAt      DateTime?        @db.DateTime
+  project        Project?         @relation(fields: [projectId], references: [id])
+  Field          Field[]
+  FormPermission FormPermission[]
+}
+
+model FormPermission {
+  id        Int      @id @default(autoincrement())
+  formId    Int
+  profileId Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  form      Form     @relation(fields: [formId], references: [id])
+  profile   Profile  @relation(fields: [profileId], references: [id])
+}
+
+model FieldType {
+  id          Int       @id @default(autoincrement())
+  code        String    @db.VarChar(255)
+  label       String    @db.VarChar(255)
+  value       String    @db.VarChar(255)
+  description String?   @db.Text
+  status      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? @db.DateTime
+  Field       Field[]
+}
+
+model Field {
+  id           Int       @id @default(autoincrement())
+  formId       Int
+  code         String    @db.VarChar(255)
+  label        String    @db.VarChar(255)
+  slug         String    @db.VarChar(255)
+  description  String    @db.Text
+  optionnal    Boolean   @default(false)
+  defaultValue String?   @db.Text
+  exampleValue String?   @db.Text
+  selectValues String?   @db.Text
+  fieldTypeId  Int
+  isActive     Boolean   @default(true)
+  isDeleted    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime? @db.DateTime
+  fieldType    FieldType @relation(fields: [fieldTypeId], references: [id])
+  form         Form      @relation(fields: [formId], references: [id])
+  DataRow      DataRow[]
+}
+
+model DataRow {
+  id        Int      @id @default(autoincrement())
+  sessionUuid String   @db.VarChar(255)
+  fieldId   Int
+  userId Int
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  field     Field    @relation(fields: [fieldId], references: [id])
+  user   User     @relation(fields: [userId], references: [id])
+}
