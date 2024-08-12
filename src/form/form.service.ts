@@ -136,6 +136,7 @@ export class FormService {
         uuid: generateUuid(),
         name: `${form.name} - Copie`,
         description: form.description,
+        duplicatedFrom: form.id,
         Field: {
           createMany: {
             data: formFields.map((field) => ({

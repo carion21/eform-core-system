@@ -16,7 +16,7 @@ export class ProjectService {
   constructor(private readonly prismaService: PrismaService) {}
 
   async create(createProjectDto: CreateProjectDto, userAuthenticated: any) {
-    const { name, description } = createProjectDto;
+    const { name, description, formId, teamids } = createProjectDto;
 
     // Create a new project
     const project = await this.prismaService.project.create({
@@ -31,6 +31,49 @@ export class ProjectService {
         translate('Erreur lors de la création du projet'),
       );
 
+    if (formId) {
+      // Retrieve the form
+      const form = await this.prismaService.form.findUnique({
+        where: {
+          id: formId,
+        },
+      });
+      if (!form)
+        throw new NotFoundException(translate('Formulaire introuvable'));
+
+      // Attach the form to the project
+      await this.prismaService.form.update({
+        where: {
+          id: formId,
+        },
+        data: {
+          projectId: project.id,
+        },
+      });
+    }
+
+    // Add teams to the project
+    if (teamids.length > 0) {
+      const teams = await this.prismaService.team.findMany({
+        where: {
+          id: {
+            in: teamids,
+          },
+        },
+      });
+      if (teams.length !== teamids.length)
+        throw new NotFoundException(
+          translate("Il semble que certaines équipes n'existent pas"),
+        );
+
+      await this.prismaService.projectTeam.createMany({
+        data: teams.map((team) => ({
+          projectId: project.id,
+          teamId: team.id,
+        })),
+      });
+    }
+
     // Return the response
     return {
       message: translate('Projet créé avec succès'),
@@ -41,6 +84,30 @@ export class ProjectService {
   async findAll() {
     const projects = await this.prismaService.project.findMany({
       include: {
+        Form: {
+          include: {
+            Field: {
+              select: {
+                id: true,
+                code: true,
+                label: true,
+                slug: true,
+                description: true,
+                optionnal: true,
+                defaultValue: true,
+                exampleValue: true,
+                selectValues: true,
+                fieldType: {
+                  select: {
+                    id: true,
+                    label: true,
+                    value: true,
+                  },
+                },
+              },
+            },
+          },
+        },
         ProjectTeam: {
           include: {
             team: true,
@@ -65,6 +132,30 @@ export class ProjectService {
   async findOne(id: number) {
     const project = await this.prismaService.project.findUnique({
       include: {
+        Form: {
+          include: {
+            Field: {
+              select: {
+                id: true,
+                code: true,
+                label: true,
+                slug: true,
+                description: true,
+                optionnal: true,
+                defaultValue: true,
+                exampleValue: true,
+                selectValues: true,
+                fieldType: {
+                  select: {
+                    id: true,
+                    label: true,
+                    value: true,
+                  },
+                },
+              },
+            },
+          },
+        },
         ProjectTeam: {
           include: {
             team: true,
@@ -100,6 +191,7 @@ export class ProjectService {
         code: genProjectCode(),
         name: project.name + ' (Copie)',
         description: project.description,
+        duplicatedFrom: project.id,
       },
     });
     if (!duplicatedProject)

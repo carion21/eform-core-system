@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsString } from "class-validator";
+import { Type } from "class-transformer";
+import { IsArray, IsNotEmpty, IsNumber, IsString } from "class-validator";
 
 export class CreateProjectDto {
 
@@ -8,4 +9,13 @@ export class CreateProjectDto {
 
     @IsString()
     readonly description: string;
+
+    @IsNumber()
+    @IsNotEmpty()
+    readonly formId: number;
+
+    @IsArray()
+    @IsNotEmpty()
+    @Type(() => Number)
+    readonly teamids: number[];
 }

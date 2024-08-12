@@ -68,6 +68,8 @@ export class TeamService {
               select: {
                 id: true,
                 email: true,
+                lastname: true,
+                firstname: true,
                 profile: {
                   select: {
                     label: true,
@@ -106,6 +108,8 @@ export class TeamService {
               select: {
                 id: true,
                 email: true,
+                lastname: true,
+                firstname: true,
                 profile: {
                   select: {
                     label: true,

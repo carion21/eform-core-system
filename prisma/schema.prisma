@@ -87,18 +87,22 @@ model TeamUser {
 }
 
 model Project {
-  id             Int           @id @default(autoincrement())
-  code           String        @db.VarChar(255)
-  name           String        @db.VarChar(255)
-  description    String        @db.Text
-  duplicatedFrom Int?
-  isActive       Boolean       @default(true)
-  isDeleted      Boolean       @default(false)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  deletedAt      DateTime?     @db.DateTime
-  ProjectTeam    ProjectTeam[]
-  Form           Form[]
+  id                 Int           @id @default(autoincrement())
+  code               String        @db.VarChar(255)
+  name               String        @db.VarChar(255)
+  description        String        @db.Text
+  duplicatedFrom     Int?          @default(0)
+  salesPointToReach  Int?          @default(0)
+  peopleToReach      Int?          @default(0)
+  drinkRacks         Int?          @default(0)
+  bottlesDistributed Int?          @default(0)
+  isActive           Boolean       @default(true)
+  isDeleted          Boolean       @default(false)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  deletedAt          DateTime?     @db.DateTime
+  ProjectTeam        ProjectTeam[]
+  Form               Form[]
 }
 
 model ProjectTeam {
@@ -117,6 +121,7 @@ model Form {
   code           String           @db.VarChar(255)
   name           String           @db.VarChar(255)
   description    String           @db.Text
+  duplicatedFrom Int?             @default(0)
   uuid           String           @db.VarChar(255)
   isActive       Boolean          @default(true)
   isDeleted      Boolean          @default(false)
@@ -175,13 +180,13 @@ model Field {
 }
 
 model DataRow {
-  id        Int      @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   sessionUuid String   @db.VarChar(255)
-  fieldId   Int
-  userId Int
-  value     String   @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  field     Field    @relation(fields: [fieldId], references: [id])
-  user   User     @relation(fields: [userId], references: [id])
+  fieldId     Int
+  userId      Int
+  value       String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  field       Field    @relation(fields: [fieldId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
 }

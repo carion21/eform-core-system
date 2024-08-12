@@ -100,6 +100,7 @@ export class StoreService {
     const form = await this.prismaService.form.findFirst({
       where: {
         uuid: formUuid,
+        isDeleted: false,
       },
       include: {
         Field: {
@@ -110,6 +111,9 @@ export class StoreService {
       },
     });
     if (!form) throw new NotFoundException(translate('Formulaire introuvable'));
+
+    if (!form.isActive)
+      throw new ForbiddenException(translate('Formulaire désactivé'));
 
     // check if the user has the right to show data in the form
     if (

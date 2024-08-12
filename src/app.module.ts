@@ -7,11 +7,22 @@ import { PrismaModule } from './prisma/prisma.module';
 import { UserModule } from './user/user.module';
 import { TeamModule } from './team/team.module';
 import { ProjectModule } from './project/project.module';
+import { FieldTypeModule } from './field-type/field-type.module';
 import { FormModule } from './form/form.module';
 import { StoreModule } from './store/store.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, AuthModule, UserModule, TeamModule, ProjectModule, FormModule, StoreModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    AuthModule,
+    UserModule,
+    TeamModule,
+    ProjectModule,
+    FieldTypeModule,
+    FormModule,
+    StoreModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

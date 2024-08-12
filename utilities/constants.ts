@@ -105,6 +105,7 @@ export class Consts {
   static ROLES: object = {
     admin: [
       'profile_find_all',
+      'field_type_find_all',
       'user_create',
       'user_find_all',
       'user_find_one',
@@ -138,8 +139,8 @@ export class Consts {
       'form_duplicate',
       'store_show',
     ],
-    supervisor: ['store_save', 'store_show'],
-    sampler: ['store_save', 'store_show'],
-    viewer: ['subscription_find_all'],
+    supervisor: ['field_type_find_all', 'store_save', 'store_show'],
+    sampler: ['field_type_find_all', 'store_save', 'store_show'],
+    viewer: [''],
   };
 }
