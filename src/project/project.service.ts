@@ -16,7 +16,16 @@ export class ProjectService {
   constructor(private readonly prismaService: PrismaService) {}
 
   async create(createProjectDto: CreateProjectDto, userAuthenticated: any) {
-    const { name, description, formId, teamids } = createProjectDto;
+    const {
+      name,
+      description,
+      bottlesDistributed,
+      drinkRacks,
+      peopleToReach,
+      salesPointToReach,
+      formId,
+      teamids,
+    } = createProjectDto;
 
     // Create a new project
     const project = await this.prismaService.project.create({
@@ -24,6 +33,10 @@ export class ProjectService {
         code: genProjectCode(),
         name,
         description,
+        bottlesDistributed,
+        drinkRacks,
+        peopleToReach,
+        salesPointToReach,
       },
     });
     if (!project)
@@ -66,6 +79,7 @@ export class ProjectService {
           translate("Il semble que certaines équipes n'existent pas"),
         );
 
+      // Add teams to the project
       await this.prismaService.projectTeam.createMany({
         data: teams.map((team) => ({
           projectId: project.id,
@@ -207,7 +221,16 @@ export class ProjectService {
   }
 
   async update(id: number, updateProjectDto: UpdateProjectDto) {
-    const { name, description } = updateProjectDto;
+    const {
+      name,
+      description,
+      bottlesDistributed,
+      drinkRacks,
+      peopleToReach,
+      salesPointToReach,
+      formId,
+      teamids,
+    } = updateProjectDto;
 
     // Retrieve the project
     const project = await this.prismaService.project.findUnique({
@@ -226,12 +249,67 @@ export class ProjectService {
       data: {
         name,
         description,
+        bottlesDistributed,
+        drinkRacks,
+        peopleToReach,
+        salesPointToReach,
       },
     });
     if (!updatedProject)
       throw new InternalServerErrorException(
         translate('Erreur lors de la mise à jour du projet'),
       );
+
+    if (formId) {
+      // Retrieve the form
+      const form = await this.prismaService.form.findUnique({
+        where: {
+          id: formId,
+        },
+      });
+      if (!form)
+        throw new NotFoundException(translate('Formulaire introuvable'));
+
+      // Attach the form to the project
+      await this.prismaService.form.update({
+        where: {
+          id: formId,
+        },
+        data: {
+          projectId: id,
+        },
+      });
+    }
+
+    // Add teams to the project
+    if (teamids.length > 0) {
+      const teams = await this.prismaService.team.findMany({
+        where: {
+          id: {
+            in: teamids,
+          },
+        },
+      });
+      if (teams.length !== teamids.length)
+        throw new NotFoundException(
+          translate("Il semble que certaines équipes n'existent pas"),
+        );
+
+      // Remove all teams from the project
+      await this.prismaService.projectTeam.deleteMany({
+        where: {
+          projectId: id,
+        },
+      });
+
+      // Add teams to the project
+      await this.prismaService.projectTeam.createMany({
+        data: teams.map((team) => ({
+          projectId: id,
+          teamId: team.id,
+        })),
+      });
+    }
 
     // Return the response
     return {

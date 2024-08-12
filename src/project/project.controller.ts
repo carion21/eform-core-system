@@ -63,13 +63,13 @@ export class ProjectController {
     return this.projectService.addTeam(+id, addTeamDto, userAuthenticated);
   }
 
-  @Patch('add-form/:id')
-  addForm(@Param('id') id: string, @Body() addFormDto: AddFormDto, @Req() request: Request) {
-    let userAuthenticated = request['user'];
-    applyRbac(userAuthenticated, 'project_add_form');
+  // @Patch('add-form/:id')
+  // addForm(@Param('id') id: string, @Body() addFormDto: AddFormDto, @Req() request: Request) {
+  //   let userAuthenticated = request['user'];
+  //   applyRbac(userAuthenticated, 'project_add_form');
 
-    return this.projectService.addForm(+id, addFormDto, userAuthenticated);
-  }
+  //   return this.projectService.addForm(+id, addFormDto, userAuthenticated);
+  // }
 
   @Patch('change-status/:id')
   changeStatus(@Param('id') id: string, @Req() request: Request) {

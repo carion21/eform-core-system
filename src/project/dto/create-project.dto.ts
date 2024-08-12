@@ -11,6 +11,18 @@ export class CreateProjectDto {
     readonly description: string;
 
     @IsNumber()
+    readonly salesPointToReach: number;
+
+    @IsNumber()
+    readonly peopleToReach: number;
+
+    @IsNumber()
+    readonly drinkRacks: number;
+
+    @IsNumber()
+    readonly bottlesDistributed: number;
+
+    @IsNumber()
     @IsNotEmpty()
     readonly formId: number;
 
