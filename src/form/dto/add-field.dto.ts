@@ -1,10 +1,15 @@
-import { IsBoolean, IsNotEmpty, IsNumber, IsString } from "class-validator";
+import { IsBoolean, IsNotEmpty, IsNumber, IsString, IsUUID } from "class-validator";
 
 export class AddFieldDto {
 
     @IsNumber()
     @IsNotEmpty()
     readonly fieldTypeId: number;
+
+    // @IsUUID()
+    @IsString()
+    @IsNotEmpty()
+    readonly uuid: string;
 
     @IsString()
     @IsNotEmpty()
@@ -15,7 +20,7 @@ export class AddFieldDto {
 
     @IsBoolean()
     // default value is false
-    readonly optionnal: boolean = false;
+    readonly optional: boolean = false;
 
     @IsString()
     readonly defaultValue: string;

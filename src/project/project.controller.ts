@@ -6,7 +6,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { applyRbac } from 'utilities/functions';
 import { AddTeamDto } from './dto/add-team.dto';
-import { AddFormDto } from './dto/add-form.dto';
+import { FillKpiDto } from './dto/fill-kpi.dto';
 
 @ApiTags('Gestion des projets de collecte')
 @ApiBearerAuth()
@@ -31,14 +31,6 @@ export class ProjectController {
     return this.projectService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string, @Req() request: Request) {
-    let userAuthenticated = request['user'];
-    applyRbac(userAuthenticated, 'project_find_one');
-
-    return this.projectService.findOne(+id);
-  }
-
   @Get('duplicate/:id')
   duplicate(@Param('id') id: string, @Req() request: Request) {
     let userAuthenticated = request['user'];
@@ -47,12 +39,20 @@ export class ProjectController {
     return this.projectService.duplicate(+id, userAuthenticated);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProjectDto: UpdateProjectDto, @Req() request: Request) {
+  @Get(':id')
+  findOne(@Param('id') id: string, @Req() request: Request) {
     let userAuthenticated = request['user'];
-    applyRbac(userAuthenticated, 'project_update');
+    applyRbac(userAuthenticated, 'project_find_one');
 
-    return this.projectService.update(+id, updateProjectDto);
+    return this.projectService.findOne(+id);
+  }
+
+  @Patch('fill-kpi/:id')
+  fillKpi(@Param('id') id: string, @Body() fillKpiDto: FillKpiDto, @Req() request: Request) {
+    let userAuthenticated = request['user'];
+    applyRbac(userAuthenticated, 'project_fill_kpi');
+
+    return this.projectService.fillKpi(+id, fillKpiDto, userAuthenticated);
   }
 
   @Patch('add-team/:id')
@@ -63,20 +63,20 @@ export class ProjectController {
     return this.projectService.addTeam(+id, addTeamDto, userAuthenticated);
   }
 
-  // @Patch('add-form/:id')
-  // addForm(@Param('id') id: string, @Body() addFormDto: AddFormDto, @Req() request: Request) {
-  //   let userAuthenticated = request['user'];
-  //   applyRbac(userAuthenticated, 'project_add_form');
-
-  //   return this.projectService.addForm(+id, addFormDto, userAuthenticated);
-  // }
-
   @Patch('change-status/:id')
   changeStatus(@Param('id') id: string, @Req() request: Request) {
     let userAuthenticated = request['user'];
     applyRbac(userAuthenticated, 'project_change_status');
 
     return this.projectService.changeStatus(+id, userAuthenticated);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateProjectDto: UpdateProjectDto, @Req() request: Request) {
+    let userAuthenticated = request['user'];
+    applyRbac(userAuthenticated, 'project_update');
+
+    return this.projectService.update(+id, updateProjectDto);
   }
 
   @Delete(':id')

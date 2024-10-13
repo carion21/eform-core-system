@@ -1,4 +1,8 @@
 import requests as rq
+from random import randint
+from random_username.generate import generate_username
+
+team_names = generate_username(2)
 
 
 BASE_URL = 'http://127.0.0.1:4525'
@@ -9,6 +13,14 @@ NB_FORM = 2
 
 USERNAME = 'admin@eform.com'
 PASSWORD = 'qwertyuiop1234'
+
+team_names = generate_username(NB_TEAM)
+project_names = generate_username(NB_PROJECT)
+form_names = generate_username(NB_FORM)
+
+print('team_names', team_names)
+print('project_names', project_names)
+print('form_names', form_names)
 
 
 def login():
@@ -116,13 +128,13 @@ factor = 0
 team_datas = []
 for i in range(NB_TEAM):
     team_data = {
-        'name': 'Team ' + str(i+1+factor),
+        'name': 'Team ' + team_names[i],
     }
     # create 1 supervisor
     supervisor_data = create_user(token, {
         "lastname": "Supervisor",
-        "firstname": str(i+1+factor),
-        "email": "supervisor" + str(i+1+factor) + "@eform.com",
+        "firstname": team_names[i],
+        "email": f"supervisor-{str(team_names[i]).lower()}@eform.com",
         "phone": "0123456789",
         "password": "123456",
         "role": "supervisor",
@@ -133,8 +145,8 @@ for i in range(NB_TEAM):
     for j in range(2):
         sampler_data = create_user(token, {
             "lastname": "Sampler",
-            "firstname": str(i+1+factor) + str(j+1+factor),
-            "email": "sampler" + str(i+1+factor) + str(j+1+factor) + "@eform.com",
+            "firstname": team_names[i] + str(j+1+factor),
+            "email": f"sampler-{str(team_names[i]).lower()}-{str(j+1+factor)}@eform.com",
             "phone": "0123456789",
             "password": "123456",
             "role": "sampler",
@@ -203,31 +215,40 @@ field_datas = [
 ]
 
 for k in range(NB_PROJECT):
+    kpi_values = {
+        "points-de-vente-visites": randint(10, 50),
+        "nombre-de-clients-visites": randint(200, 1000),
+        "nombre-de-casiers-vendus": randint(1, 100),
+        "nombre-de-bouteilles-distribuees": randint(100, 1000)
+    }
     project_data = {
-        'name': 'Project ' + str(k+1+factor),
-        'description': 'Description ' + str(k+1+factor),
+        'name': 'Project ' + project_names[k],
+        'description': 'Description ' + project_names[k],
+        "formId": 0,
+        "teamids": [td.get('id') for td in team_datas],
+        "kpiValues": kpi_values
     }
     r_project = create_project(token, project_data)
     print(r_project.get('message'))
     # create 2 forms
-    form_datas = []
-    for l in range(2):
-        form_data = {
-            'name': 'Form ' + str(k+1+factor) + str(l+1+factor),
-            'description': 'Description ' + str(k+1+factor) + str(l+1+factor),
-        }
-        r_form = create_form(token, form_data)
-        print(r_form.get('message'))
-        fdas = field_datas[l]
-        for fd in fdas:
-            fd['formId'] = r_form.get('data').get('id')
-            r_field = add_field(token, fd)
-            print(r_field.get('message'))
-        form_datas.append(r_form.get('data'))
-    r_afp = add_form_to_project(token, r_project.get('data').get('id'), [
-                                fd.get('id') for fd in form_datas])
-    print(r_afp.get('message'))
+    # form_datas = []
+    # for l in range(2):
+    #     form_data = {
+    #         'name': 'Form ' + str(k+1+factor) + str(l+1+factor),
+    #         'description': 'Description ' + str(k+1+factor) + str(l+1+factor),
+    #     }
+    #     r_form = create_form(token, form_data)
+    #     print(r_form.get('message'))
+    #     fdas = field_datas[l]
+    #     for fd in fdas:
+    #         fd['formId'] = r_form.get('data').get('id')
+    #         r_field = add_field(token, fd)
+    #         print(r_field.get('message'))
+    #     form_datas.append(r_form.get('data'))
+    # r_afp = add_form_to_project(token, r_project.get('data').get('id'), [
+    #                             fd.get('id') for fd in form_datas])
+    # print(r_afp.get('message'))
 
-    r_atp = add_team_to_project(token, r_project.get('data').get('id'), [
-                                td.get('id') for td in team_datas])
-    print(r_atp.get('message'))
+    # r_atp = add_team_to_project(token, r_project.get('data').get('id'), [
+    #                             td.get('id') for td in team_datas])
+    # print(r_atp.get('message'))

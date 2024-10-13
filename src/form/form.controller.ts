@@ -6,6 +6,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { applyRbac } from 'utilities/functions';
 import { AddFieldDto } from './dto/add-field.dto';
+import { UpdateFieldsDto } from './dto/update-fields.dto';
 
 @ApiTags('Gestion des formulaires')
 @ApiBearerAuth()
@@ -38,6 +39,14 @@ export class FormController {
     return this.formService.findOne(+id);
   }
 
+  @Get('by-uuid/:uuid')
+  findOneByUuid(@Param('uuid') uuid: string, @Req() request: Request) {
+    let userAuthenticated = request['user'];
+    applyRbac(userAuthenticated, 'form_find_one');
+
+    return this.formService.findOneByUuid(uuid);
+  }
+
   @Get('duplicate/:id')
   duplicate(@Param('id') id: string, @Req() request: Request) {
     let userAuthenticated = request['user'];
@@ -60,6 +69,14 @@ export class FormController {
     applyRbac(userAuthenticated, 'form_add_field');
 
     return this.formService.addField(+id, addFieldDto, userAuthenticated);
+  }
+
+  @Patch('update-fields/:id')
+  updateFields(@Param('id') id: string, @Body() updateFieldsDto: UpdateFieldsDto, @Req() request: Request) {
+    let userAuthenticated = request['user'];
+    applyRbac(userAuthenticated, 'form_update_fields');
+
+    return this.formService.updateFields(+id, updateFieldsDto, userAuthenticated);
   }
 
   @Patch('change-status/:id')

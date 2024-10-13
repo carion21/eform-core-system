@@ -7,25 +7,19 @@ import {
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { genProjectCode, translate } from 'utilities/functions';
+import { controlData, genProjectCode, translate } from 'utilities/functions';
 import { AddTeamDto } from './dto/add-team.dto';
-import { AddFormDto } from './dto/add-form.dto';
+import { Consts } from 'utilities/constants';
+import { parse } from 'path';
+import { FillKpiDto } from './dto/fill-kpi.dto';
 
 @Injectable()
 export class ProjectService {
+  // Add teams to the project
   constructor(private readonly prismaService: PrismaService) {}
 
   async create(createProjectDto: CreateProjectDto, userAuthenticated: any) {
-    const {
-      name,
-      description,
-      bottlesDistributed,
-      drinkRacks,
-      peopleToReach,
-      salesPointToReach,
-      formId,
-      teamids,
-    } = createProjectDto;
+    const { name, description, formId, teamids, kpiValues } = createProjectDto;
 
     // Create a new project
     const project = await this.prismaService.project.create({
@@ -33,10 +27,6 @@ export class ProjectService {
         code: genProjectCode(),
         name,
         description,
-        bottlesDistributed,
-        drinkRacks,
-        peopleToReach,
-        salesPointToReach,
       },
     });
     if (!project)
@@ -54,13 +44,13 @@ export class ProjectService {
       if (!form)
         throw new NotFoundException(translate('Formulaire introuvable'));
 
-      // Attach the form to the project
-      await this.prismaService.form.update({
+      // Attach the project to the form
+      await this.prismaService.project.update({
         where: {
-          id: formId,
+          id: project.id,
         },
         data: {
-          projectId: project.id,
+          formId,
         },
       });
     }
@@ -88,6 +78,39 @@ export class ProjectService {
       });
     }
 
+    // Add KPI values to the project
+    const kpis = await this.prismaService.kpi.findMany();
+
+    let mapFieldTypes = {};
+    kpis.forEach((kpi) => {
+      let k = kpi.slug;
+      let v = Consts.DEFAULT_KPI_VALUE_TYPE;
+      mapFieldTypes[k] = v;
+    });
+
+    const allFields = kpis.map((kpi) => kpi.slug);
+    const requiredFields = kpis.map((kpi) => kpi.slug);
+    const mapSelectValues = {};
+
+    let inputs = {
+      data: kpiValues,
+      mapFieldTypes: mapFieldTypes,
+      allFields: allFields,
+      requiredFields: requiredFields,
+      mapSelectValues: mapSelectValues,
+    };
+    const bcontrol = controlData(inputs);
+    if (!bcontrol.success)
+      throw new BadRequestException(translate(bcontrol.message));
+
+    const projectKpis = await this.prismaService.kpiByProject.createMany({
+      data: kpis.map((kpi) => ({
+        projectId: project.id,
+        kpiId: kpi.id,
+        value: parseInt(kpiValues[kpi.slug]),
+      })),
+    });
+
     // Return the response
     return {
       message: translate('Projet créé avec succès'),
@@ -98,7 +121,7 @@ export class ProjectService {
   async findAll() {
     const projects = await this.prismaService.project.findMany({
       include: {
-        Form: {
+        form: {
           include: {
             Field: {
               select: {
@@ -107,7 +130,7 @@ export class ProjectService {
                 label: true,
                 slug: true,
                 description: true,
-                optionnal: true,
+                optional: true,
                 defaultValue: true,
                 exampleValue: true,
                 selectValues: true,
@@ -146,7 +169,7 @@ export class ProjectService {
   async findOne(id: number) {
     const project = await this.prismaService.project.findUnique({
       include: {
-        Form: {
+        form: {
           include: {
             Field: {
               select: {
@@ -155,7 +178,7 @@ export class ProjectService {
                 label: true,
                 slug: true,
                 description: true,
-                optionnal: true,
+                optional: true,
                 defaultValue: true,
                 exampleValue: true,
                 selectValues: true,
@@ -220,17 +243,92 @@ export class ProjectService {
     };
   }
 
+  async fillKpi(id: number, fillKpiDto: FillKpiDto, userAuthenticated: object) {
+    // Add teams to the project
+    const { kpiDatas } = fillKpiDto;
+
+    // Retrieve the project
+    const project = await this.prismaService.project.findUnique({
+      where: {
+        id,
+        isDeleted: false,
+      },
+    });
+    if (!project) throw new NotFoundException(translate('Projet introuvable'));
+
+    // control kpiDatas
+    const kpis = await this.prismaService.kpi.findMany();
+
+    let mapFieldTypes = {};
+    kpis.forEach((kpi) => {
+      let k = kpi.slug;
+      let v = Consts.DEFAULT_KPI_VALUE_TYPE;
+      mapFieldTypes[k] = v;
+    });
+
+    const allFields = kpis.map((kpi) => kpi.slug);
+    const requiredFields = kpis.map((kpi) => kpi.slug);
+    const mapSelectValues = {};
+
+    let inputs = {
+      data: kpiDatas,
+      mapFieldTypes: mapFieldTypes,
+      allFields: allFields,
+      requiredFields: requiredFields,
+      mapSelectValues: mapSelectValues,
+    };
+    const bcontrol = controlData(inputs);
+    if (!bcontrol.success)
+      throw new BadRequestException(translate(bcontrol.message));
+
+    // Get team of the user
+    const uteams = await this.prismaService.teamUser.findMany({
+      where: {
+        userId: userAuthenticated['id'],
+      },
+      select: {
+        teamId: true,
+      },
+    });
+    const teamIds = uteams.map((uteam) => uteam.teamId);
+    const team = await this.prismaService.projectTeam.findFirst({
+      where: {
+        projectId: id,
+        teamId: {
+          in: teamIds,
+        },
+      },
+    });
+    if (!team)
+      throw new NotFoundException(
+        translate('Vous ne pouvez pas remplir ces KPIs| Equipe introuvable ou non autorisée'),
+      );
+
+    // Remove all KPI values from the project
+    await this.prismaService.kpiByTeam.deleteMany({
+      where: {
+        projectId: id,
+        teamId: team.teamId, 
+      },
+    });
+    // Re-create all KPI values to the project
+    await this.prismaService.kpiByTeam.createMany({
+      data: kpis.map((kpi) => ({
+        projectId: id,
+        teamId: team.teamId,
+        kpiId: kpi.id,
+        value: parseInt(kpiDatas[kpi.slug]),
+      })),
+    });
+
+    // Return the response
+    return {
+      message: translate('KPIs remplis avec succès'),
+    };
+  }
+
   async update(id: number, updateProjectDto: UpdateProjectDto) {
-    const {
-      name,
-      description,
-      bottlesDistributed,
-      drinkRacks,
-      peopleToReach,
-      salesPointToReach,
-      formId,
-      teamids,
-    } = updateProjectDto;
+    const { name, description, formId, teamids, kpiValues } = updateProjectDto;
 
     // Retrieve the project
     const project = await this.prismaService.project.findUnique({
@@ -249,10 +347,6 @@ export class ProjectService {
       data: {
         name,
         description,
-        bottlesDistributed,
-        drinkRacks,
-        peopleToReach,
-        salesPointToReach,
       },
     });
     if (!updatedProject)
@@ -270,19 +364,19 @@ export class ProjectService {
       if (!form)
         throw new NotFoundException(translate('Formulaire introuvable'));
 
-      // Attach the form to the project
-      await this.prismaService.form.update({
+      // Attach the project to the form
+      await this.prismaService.project.update({
         where: {
-          id: formId,
+          id: id,
         },
         data: {
-          projectId: id,
+          formId,
         },
       });
     }
 
     // Add teams to the project
-    if (teamids.length > 0) {
+    if (teamids && teamids.length > 0) {
       const teams = await this.prismaService.team.findMany({
         where: {
           id: {
@@ -307,6 +401,49 @@ export class ProjectService {
         data: teams.map((team) => ({
           projectId: id,
           teamId: team.id,
+        })),
+      });
+    }
+
+    if (kpiValues) {
+      // Update KPI values to the project
+
+      const kpis = await this.prismaService.kpi.findMany();
+
+      let mapFieldTypes = {};
+      kpis.forEach((kpi) => {
+        let k = kpi.slug;
+        let v = Consts.DEFAULT_KPI_VALUE_TYPE;
+        mapFieldTypes[k] = v;
+      });
+
+      const allFields = kpis.map((kpi) => kpi.slug);
+      const requiredFields = kpis.map((kpi) => kpi.slug);
+      const mapSelectValues = {};
+
+      let inputs = {
+        data: kpiValues,
+        mapFieldTypes: mapFieldTypes,
+        allFields: allFields,
+        requiredFields: requiredFields,
+        mapSelectValues: mapSelectValues,
+      };
+      const bcontrol = controlData(inputs);
+      if (!bcontrol.success)
+        throw new BadRequestException(translate(bcontrol.message));
+
+      // Remove all KPI values from the project
+      await this.prismaService.kpiByProject.deleteMany({
+        where: {
+          projectId: id,
+        },
+      });
+      // Re-create all KPI values to the project
+      const projectKpis = await this.prismaService.kpiByProject.createMany({
+        data: kpis.map((kpi) => ({
+          projectId: id,
+          kpiId: kpi.id,
+          value: parseInt(kpiValues[kpi.slug]),
         })),
       });
     }
@@ -365,63 +502,6 @@ export class ProjectService {
     // Return the response
     return {
       message: translate('Équipe.s ajoutée avec succès au projet'),
-    };
-  }
-
-  async addForm(id: number, addFormDto: AddFormDto, userAuthenticated: any) {
-    const { formids } = addFormDto;
-
-    if (formids.length === 0)
-      throw new BadRequestException(
-        translate('Veuillez sélectionner au moins un formulaire'),
-      );
-
-    // Retrieve the project
-    const project = await this.prismaService.project.findUnique({
-      where: {
-        id,
-        isDeleted: false,
-      },
-    });
-    if (!project) throw new NotFoundException(translate('Projet introuvable'));
-
-    const forms = await this.prismaService.form.findMany({
-      where: {
-        id: {
-          in: formids,
-        },
-      },
-    });
-    if (forms.length !== formids.length)
-      throw new NotFoundException(
-        translate("Il semble que certains formulaires n'existent pas"),
-      );
-
-    // Detach all forms from the project
-    await this.prismaService.form.updateMany({
-      where: {
-        projectId: id,
-      },
-      data: {
-        projectId: null,
-      },
-    });
-
-    // Attach forms to the project
-    await this.prismaService.form.updateMany({
-      where: {
-        id: {
-          in: formids,
-        },
-      },
-      data: {
-        projectId: id,
-      },
-    });
-
-    // Return the response
-    return {
-      message: translate('Formulaire.s ajouté avec succès au projet'),
     };
   }
 

@@ -15,6 +15,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { applyRbac } from 'utilities/functions';
+import { UpdatePasswordDto } from './dto/update-password.dto';
 
 @ApiTags('Gestion des utilisateurs')
 @ApiBearerAuth()
@@ -39,6 +40,14 @@ export class UserController {
     return this.userService.findAll(userAuthenticated);
   }
 
+  @Get('me')
+  findMe(@Req() request: Request) {
+    let userAuthenticated = request['user'];
+    applyRbac(userAuthenticated, 'user_find_me');
+
+    return this.userService.findOne(userAuthenticated.id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @Req() request: Request) {
     let userAuthenticated = request['user'];
@@ -57,6 +66,18 @@ export class UserController {
     applyRbac(userAuthenticated, 'user_update');
 
     return this.userService.update(+id, updateUserDto, userAuthenticated);
+  }
+
+  @Patch('update-password/:id')
+  updatePassword(
+    @Param('id') id: string,
+    @Body() updatePasswordDto: UpdatePasswordDto,
+    @Req() request: Request,
+  ) {
+    let userAuthenticated = request['user'];
+    applyRbac(userAuthenticated, 'user_update_password');
+
+    return this.userService.updatePassword(+id, updatePasswordDto, userAuthenticated);
   }
 
   @Patch('change-status/:id')

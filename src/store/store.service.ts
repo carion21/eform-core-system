@@ -22,6 +22,7 @@ export class StoreService {
         uuid: formUuid,
       },
       include: {
+        Project: true,
         Field: {
           include: {
             fieldType: true,
@@ -41,7 +42,50 @@ export class StoreService {
     if (!formPermission || !formPermission.isActive)
       throw new ForbiddenException(
         translate(
-          "Vous n'avez pas le droit de sauvegarder des données via ce formulaire",
+          "Vous n'avez pas le droit de sauvegarder des données via ce formulaire| Profil non autorisé",
+        ),
+      );
+
+    // check if the user has the right to save data in the project
+    const formProject = form.Project[0];
+    const projectTeams = await this.prismaService.projectTeam.findMany({
+      where: {
+        projectId: formProject.id,
+      },
+      select: {
+        team: {
+          select: {
+            id: true,
+            isActive: true,
+          },
+        },
+      },
+    });
+    const projectTeamIds = projectTeams
+      .filter((projectTeam) => projectTeam.team.isActive)
+      .map((projectTeam) => projectTeam.team.id);
+    // console.log('projectTeamIds', projectTeamIds);
+
+    const userTeams = await this.prismaService.teamUser.findMany({
+      where: {
+        userId: userAuthenticated['id'],
+      },
+      select: {
+        teamId: true,
+      },
+    });
+    const userTeamIds = userTeams.map((userTeam) => userTeam.teamId);
+    // console.log('userTeamIds', userTeamIds);
+
+    const commonTeamIds = projectTeamIds.filter((teamId) =>
+      userTeamIds.includes(teamId),
+    );
+    // console.log('commonTeamIds', commonTeamIds);
+
+    if (commonTeamIds.length === 0)
+      throw new ForbiddenException(
+        translate(
+          "Vous n'avez pas le droit de sauvegarder des données via ce formulaire| Équipe non autorisée",
         ),
       );
 
@@ -56,14 +100,17 @@ export class StoreService {
 
     const allFields = fields.map((field) => field.slug);
     const requiredFields = fields
-      .filter((field) => !field.optionnal)
+      .filter((field) => !field.optional)
       .map((field) => field.slug);
+
+    console.log('requiredFields', requiredFields);
+    
 
     const mapSelectValues = {};
     fields.forEach((field) => {
       if (field.fieldType.value === 'select') {
         // selectValues is string split by comma -> convert to array
-        mapSelectValues[field.slug] = field.selectValues.split(',');
+        mapSelectValues[field.slug] = field.selectValues.split(';');
       }
     });
 
@@ -85,7 +132,7 @@ export class StoreService {
         sessionUuid: sessionUuid,
         userId: userAuthenticated['id'],
         fieldId: field.id,
-        value: data[field.slug],
+        value: data[field.slug].toString(),
       })),
     });
 

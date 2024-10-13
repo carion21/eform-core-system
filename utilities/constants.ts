@@ -43,13 +43,22 @@ export class Consts {
   static DEFAULT_USERS: any[] = [
     {
       lastname: 'admin',
-      firstname: 'ama',
+      firstname: 'eform',
       email: 'admin@eform.com',
       phone: '00000000',
       username: 'admin@eform.com',
       // password: '',
     },
   ];
+
+  static DEFAULT_KPIS: string[] = [
+    'Points de vente visités',
+    'Nombre de clients visités',
+    'Nombre de casiers vendus',
+    'Nombre de bouteilles distribuées',
+  ];
+
+  static DEFAULT_KPI_VALUE_TYPE: string = 'number';
 
   static DEFAULT_FIELD_TYPES: object[] = [
     {
@@ -104,14 +113,23 @@ export class Consts {
 
   static ROLES: object = {
     admin: [
+      'change_password',
       'profile_find_all',
       'field_type_find_all',
       'user_create',
       'user_find_all',
       'user_find_one',
+      'user_find_me',
       'user_update',
+      'user_update_password',
       'user_change_status',
       'user_delete',
+
+      'kpi_create',
+      'kpi_find_all',
+      'kpi_find_one',
+      'kpi_update',
+
       'project_create',
       'project_find_all',
       'project_find_one',
@@ -136,11 +154,29 @@ export class Consts {
       'project_add_team',
       'project_add_form',
       'form_add_field',
+      'form_update_fields',
       'form_duplicate',
       'store_show',
     ],
-    supervisor: ['field_type_find_all', 'store_save', 'store_show'],
-    sampler: ['field_type_find_all', 'store_save', 'store_show'],
-    viewer: [''],
+    supervisor: [
+      'change_password',
+      'user_find_me',
+      'field_type_find_all',
+      'store_save',
+      'store_show',
+      'kpi_find_all',
+      'project_find_one',
+      'project_fill_kpi',
+      'form_find_one',
+    ],
+    sampler: [
+      'change_password',
+      'user_find_me',
+      'field_type_find_all',
+      'store_save',
+      'store_show',
+      'form_find_one',
+    ],
+    viewer: ['change_password', 'user_find_me'],
   };
 }

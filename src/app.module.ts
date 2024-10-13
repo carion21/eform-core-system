@@ -6,10 +6,12 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { UserModule } from './user/user.module';
 import { TeamModule } from './team/team.module';
+import { KpiModule } from './kpi/kpi.module';
 import { ProjectModule } from './project/project.module';
 import { FieldTypeModule } from './field-type/field-type.module';
 import { FormModule } from './form/form.module';
 import { StoreModule } from './store/store.module';
+import { StatisticsModule } from './statistics/statistics.module';
 
 @Module({
   imports: [
@@ -18,10 +20,12 @@ import { StoreModule } from './store/store.module';
     AuthModule,
     UserModule,
     TeamModule,
+    KpiModule,
     ProjectModule,
     FieldTypeModule,
     FormModule,
     StoreModule,
+    StatisticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

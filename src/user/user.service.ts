@@ -11,6 +11,7 @@ import { genUserCode, getUiAvatar, translate } from 'utilities/functions';
 
 import * as bcrypt from 'bcrypt';
 import * as moment from 'moment';
+import { UpdatePasswordDto } from './dto/update-password.dto';
 
 @Injectable()
 export class UserService {
@@ -107,8 +108,116 @@ export class UserService {
     });
     if (!user) throw new NotFoundException(translate('Utilisateur non trouvé'));
 
+    // get the teams of the user
+    // we have User - TeamUser - Team - ProjectTeam - Project
+    const uteams = await this.prismaService.teamUser.findMany({
+      where: {
+        userId: id,
+      },
+      select: {
+        id: true,
+        userId: true,
+        teamId: true,
+        team: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            ProjectTeam: {
+              select: {
+                projectId: true,
+                project: {
+                  select: {
+                    id: true,
+                    code: true,
+                    name: true,
+                    formId: true,
+                    form: {
+                      select: {
+                        id: true,
+                        uuid: true,
+                        Field: {
+                          where: {
+                            isDeleted: false,
+                          },
+                          select: {
+                            id: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    // get the unique projects of the user
+    const projects = [];
+    uteams.forEach((uteam) => {
+      uteam.team.ProjectTeam.forEach((pt) => {
+        const project = projects.find((p) => p.id === pt.projectId);
+        if (!project) {
+          projects.push({
+            id: pt.projectId,
+            code: pt.project.code,
+            name: pt.project.name,
+            form: pt.project.form,
+          });
+        }
+      });
+    });
+
+    // get the teams of the user
+    const teams = [];
+    uteams.forEach((uteam) => {
+      teams.push({
+        id: uteam.teamId,
+        code: uteam.team.code,
+        name: uteam.team.name,
+      });
+    });
+
     // generate ui avatar if profile picture is not available
     if (!user.profilePicture) user.profilePicture = getUiAvatar(user);
+
+    // get the fields of the form of projects
+    for (const project of projects) {
+      const form = project.form;
+
+      project['formId'] = form ? form.id : null;
+      project['formUuid'] = form ? form.uuid : null;
+      project['dataRowCount'] = 0;
+
+      if (!form) continue;
+
+      const fieldIds = form.Field.map((field) => field.id);
+      // Utiliser `findMany` avec `distinct`
+      const distinctSessionUuids = await this.prismaService.dataRow.findMany({
+        where: {
+          fieldId: {
+            in: fieldIds,
+          },
+          userId: user.id,
+        },
+        distinct: ['sessionUuid'], // distinct sur sessionUuid
+        select: {
+          sessionUuid: true,
+        },
+      });
+      // Compter les résultats distincts
+      project['dataRowCount'] = distinctSessionUuids.length;
+
+      Reflect.deleteProperty(project, 'form');
+    }
+
+    // add the projects to the user
+    user['projects'] = projects;
+
+    // add the teams to the user
+    user['teams'] = teams;
 
     Reflect.deleteProperty(user, 'password');
     // Return the response
@@ -163,6 +272,44 @@ export class UserService {
     return {
       message: translate('Utilisateur mis à jour'),
       data: updatedUser,
+    };
+  }
+
+  async updatePassword(
+    id: number,
+    updatePasswordDto: UpdatePasswordDto,
+    userAuthenticated: object,
+  ) {
+    const { password } = updatePasswordDto;
+
+    // check if the user exists
+    const user = await this.prismaService.user.findUnique({
+      where: {
+        id,
+        isDeleted: false,
+      },
+    });
+    if (!user) throw new NotFoundException(translate('Utilisateur non trouvé'));
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const updatedUser = await this.prismaService.user.update({
+      where: {
+        id,
+      },
+      data: {
+        password: hashedPassword,
+      },
+    });
+    if (!updatedUser)
+      throw new InternalServerErrorException(
+        translate(
+          "Erreur lors de la mise à jour du mot de passe de l'utilisateur",
+        ),
+      );
+
+    // Return the response
+    return {
+      message: translate('Mot de passe mis à jour'),
     };
   }
 

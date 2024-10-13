@@ -63,6 +63,29 @@ model UserLog {
   User   User     @relation(fields: [userId], references: [id])
 }
 
+model Kpi {
+  id           Int            @id @default(autoincrement())
+  name         String         @db.VarChar(255)
+  slug         String         @db.VarChar(255)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  KpiByTeam    KpiByTeam[]
+  KpiByProject KpiByProject[]
+}
+
+model KpiByTeam {
+  id        Int      @id @default(autoincrement())
+  teamId    Int
+  kpiId     Int
+  projectId Int
+  value     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  team      Team     @relation(fields: [teamId], references: [id])
+  kpi       Kpi      @relation(fields: [kpiId], references: [id])
+  project   Project  @relation(fields: [projectId], references: [id])
+}
+
 model Team {
   id          Int           @id @default(autoincrement())
   code        String        @db.VarChar(255)
@@ -74,6 +97,7 @@ model Team {
   deletedAt   DateTime?     @db.DateTime
   TeamUser    TeamUser[]
   ProjectTeam ProjectTeam[]
+  KpiByTeam   KpiByTeam[]
 }
 
 model TeamUser {
@@ -82,27 +106,37 @@ model TeamUser {
   userId    Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  Team      Team     @relation(fields: [teamId], references: [id])
-  User      User     @relation(fields: [userId], references: [id])
+  team      Team     @relation(fields: [teamId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model KpiByProject {
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  kpiId     Int
+  value     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id])
+  kpi       Kpi      @relation(fields: [kpiId], references: [id])
 }
 
 model Project {
-  id                 Int           @id @default(autoincrement())
-  code               String        @db.VarChar(255)
-  name               String        @db.VarChar(255)
-  description        String        @db.Text
-  duplicatedFrom     Int?          @default(0)
-  salesPointToReach  Int?          @default(0)
-  peopleToReach      Int?          @default(0)
-  drinkRacks         Int?          @default(0)
-  bottlesDistributed Int?          @default(0)
-  isActive           Boolean       @default(true)
-  isDeleted          Boolean       @default(false)
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  deletedAt          DateTime?     @db.DateTime
-  ProjectTeam        ProjectTeam[]
-  Form               Form[]
+  id             Int            @id @default(autoincrement())
+  formId         Int?
+  code           String         @db.VarChar(255)
+  name           String         @db.VarChar(255)
+  description    String         @db.Text
+  duplicatedFrom Int?           @default(0)
+  isActive       Boolean        @default(true)
+  isDeleted      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  deletedAt      DateTime?      @db.DateTime
+  form           Form?          @relation(fields: [formId], references: [id])
+  ProjectTeam    ProjectTeam[]
+  KpiByProject   KpiByProject[]
+  KpiByTeam      KpiByTeam[]
 }
 
 model ProjectTeam {
@@ -117,7 +151,6 @@ model ProjectTeam {
 
 model Form {
   id             Int              @id @default(autoincrement())
-  projectId      Int?
   code           String           @db.VarChar(255)
   name           String           @db.VarChar(255)
   description    String           @db.Text
@@ -128,9 +161,9 @@ model Form {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   deletedAt      DateTime?        @db.DateTime
-  project        Project?         @relation(fields: [projectId], references: [id])
   Field          Field[]
   FormPermission FormPermission[]
+  Project        Project[]
 }
 
 model FormPermission {
@@ -158,25 +191,36 @@ model FieldType {
 }
 
 model Field {
-  id           Int       @id @default(autoincrement())
+  id           Int         @id @default(autoincrement())
   formId       Int
-  code         String    @db.VarChar(255)
-  label        String    @db.VarChar(255)
-  slug         String    @db.VarChar(255)
-  description  String    @db.Text
-  optionnal    Boolean   @default(false)
-  defaultValue String?   @db.Text
-  exampleValue String?   @db.Text
-  selectValues String?   @db.Text
+  code         String      @db.VarChar(255)
+  label        String      @db.VarChar(255)
+  slug         String      @db.VarChar(255)
+  uuid         String      @db.VarChar(255)
+  description  String      @db.Text
+  optional     Boolean     @default(false)
+  defaultValue String?     @db.Text
+  exampleValue String?     @db.Text
+  selectValues String?     @db.Text
   fieldTypeId  Int
-  isActive     Boolean   @default(true)
-  isDeleted    Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime? @db.DateTime
-  fieldType    FieldType @relation(fields: [fieldTypeId], references: [id])
-  form         Form      @relation(fields: [formId], references: [id])
+  isActive     Boolean     @default(true)
+  isDeleted    Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?   @db.DateTime
+  fieldType    FieldType   @relation(fields: [fieldTypeId], references: [id])
+  form         Form        @relation(fields: [formId], references: [id])
   DataRow      DataRow[]
+  FieldRank    FieldRank[]
+}
+
+model FieldRank {
+  id        Int      @id @default(autoincrement())
+  fieldId   Int
+  rank      Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  field     Field    @relation(fields: [fieldId], references: [id])
 }
 
 model DataRow {

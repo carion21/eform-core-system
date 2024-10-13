@@ -4,6 +4,7 @@ import {
   genFieldTypeCode,
   genProfileCode,
   genUserCode,
+  getSlug,
 } from '../utilities/functions';
 
 import * as bcrypt from 'bcrypt';
@@ -13,33 +14,45 @@ const prisma = new PrismaClient();
 const configService = new ConfigService();
 
 async function main() {
-  // const fieldTypeDatas = Consts.DEFAULT_FIELD_TYPES.map((ftype) => {
-  //   return {
-  //     code: genFieldTypeCode(),
-  //     label: ftype['label'],
-  //     value: ftype['value'],
-  //     description: `Il s'agit du type de champ ${ftype['label']}`,
-  //   };
-  // });
-  // await prisma.fieldType.createMany({
-  //   data: fieldTypeDatas,
-  // });
-  // console.log('Field types created');
+  const kpiDatas = Consts.DEFAULT_KPIS.map((kpi) => {
+    return {
+      name: kpi,
+      slug: getSlug(kpi),
+    };
+  });
+  await prisma.kpi.createMany({
+    data: kpiDatas,
+  });
+  console.log('KPIs created');
+  
 
-  // // patienter 1 secondes
-  // await new Promise((resolve) => setTimeout(resolve, 1000));
-  // const profileDatas = Consts.PROFILES.map((profile) => {
-  //   return {
-  //     code: genProfileCode(),
-  //     label: profile['label'],
-  //     value: profile['value'],
-  //     description: profile['description'],
-  //   };
-  // });
-  // await prisma.profile.createMany({
-  //   data: profileDatas,
-  // });
-  // console.log('Profiles created');
+  const fieldTypeDatas = Consts.DEFAULT_FIELD_TYPES.map((ftype) => {
+    return {
+      code: genFieldTypeCode(),
+      label: ftype['label'],
+      value: ftype['value'],
+      description: `Il s'agit du type de champ ${ftype['label']}`,
+    };
+  });
+  await prisma.fieldType.createMany({
+    data: fieldTypeDatas,
+  });
+  console.log('Field types created');
+
+  // patienter 1 secondes
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  const profileDatas = Consts.PROFILES.map((profile) => {
+    return {
+      code: genProfileCode(),
+      label: profile['label'],
+      value: profile['value'],
+      description: profile['description'],
+    };
+  });
+  await prisma.profile.createMany({
+    data: profileDatas,
+  });
+  console.log('Profiles created');
 
   const admin_profile = await prisma.profile.findFirst({
     where: {

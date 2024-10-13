@@ -64,7 +64,7 @@ export class TeamService {
       include: {
         TeamUser: {
           include: {
-            User: {
+            user: {
               select: {
                 id: true,
                 email: true,
@@ -104,7 +104,7 @@ export class TeamService {
       include: {
         TeamUser: {
           include: {
-            User: {
+            user: {
               select: {
                 id: true,
                 email: true,
@@ -121,7 +121,117 @@ export class TeamService {
         },
       },
     });
-    if (!team) throw new NotFoundException(translate("Équipe non trouvée"));
+    if (!team) throw new NotFoundException(translate('Équipe non trouvée'));
+
+    // get the projects of the team
+    const pteams = await this.prismaService.projectTeam.findMany({
+      where: {
+        teamId: team.id,
+      },
+      select: {
+        id: true,
+        project: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+    // get the projects with the project id where is not deleted
+    const projects = await this.prismaService.project.findMany({
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        form: {
+          where: {
+            isDeleted: false,
+          },
+          select: {
+            id: true,
+            uuid: true,
+            Field: {
+              where: {
+                isDeleted: false,
+              },
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+        KpiByTeam: {
+          where: {
+            teamId: team.id,
+          },
+          select: {
+            id: true,
+            value: true,
+            kpi: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            }
+          }
+        }
+      },
+      where: {
+        id: {
+          in: pteams.map((pteam) => pteam.project.id),
+        },
+        isDeleted: false,
+      },
+    });
+    // get the fields of the form of projects
+    for (const project of projects) {
+      const kpis = [];
+      for (const kpiByTeam of project.KpiByTeam) {
+        kpis.push({
+          id: kpiByTeam.kpi.id,
+          name: kpiByTeam.kpi.name,
+          slug: kpiByTeam.kpi.slug,
+          value: kpiByTeam.value,
+        });
+      }
+      project['kpis'] = kpis;
+      Reflect.deleteProperty(project, 'KpiByTeam');
+
+      const form = project.form;
+
+      project['formId'] = form ? form.id : null;
+      project['formUuid'] = form ? form.uuid : null;
+      project['dataRowCount'] = 0;
+
+      if (!form) continue;
+
+      const fieldIds = form.Field.map((field) => field.id);
+      const userIds = team.TeamUser.map((teamUser) => teamUser.userId);
+      // Utiliser `findMany` avec `distinct`
+      const distinctSessionUuids = await this.prismaService.dataRow.findMany({
+        where: {
+          fieldId: {
+            in: fieldIds,
+          },
+          userId: {
+            in: userIds,
+          },
+        },
+        distinct: ['sessionUuid'], // distinct sur sessionUuid
+        select: {
+          sessionUuid: true,
+        },
+      });
+
+      // Compter les résultats distincts
+      project['dataRowCount'] = distinctSessionUuids.length;
+
+      Reflect.deleteProperty(project, 'form');
+    }
+
+    // add the projects to the team
+    team['projects'] = projects;
 
     // Return the response
     return {
@@ -130,7 +240,11 @@ export class TeamService {
     };
   }
 
-  async update(id: number, updateTeamDto: UpdateTeamDto, userAuthenticated: any) {
+  async update(
+    id: number,
+    updateTeamDto: UpdateTeamDto,
+    userAuthenticated: any,
+  ) {
     const { name, members } = updateTeamDto;
 
     const team = await this.prismaService.team.findFirst({
@@ -139,7 +253,7 @@ export class TeamService {
         isDeleted: false,
       },
     });
-    if (!team) throw new NotFoundException(translate("Équipe non trouvée"));
+    if (!team) throw new NotFoundException(translate('Équipe non trouvée'));
 
     let users = [];
     if (members.length > 0) {
@@ -198,7 +312,7 @@ export class TeamService {
         isDeleted: false,
       },
     });
-    if (!team) throw new NotFoundException(translate("Équipe non trouvée"));
+    if (!team) throw new NotFoundException(translate('Équipe non trouvée'));
 
     const updatedTeam = await this.prismaService.team.update({
       where: {
@@ -227,7 +341,7 @@ export class TeamService {
         isDeleted: false,
       },
     });
-    if (!team) throw new NotFoundException(translate("Équipe non trouvée"));
+    if (!team) throw new NotFoundException(translate('Équipe non trouvée'));
 
     // Remove all team users
     await this.prismaService.teamUser.deleteMany({
@@ -253,7 +367,7 @@ export class TeamService {
 
     // Return the response
     return {
-      message: translate('Équipe supprimée')
+      message: translate('Équipe supprimée'),
     };
   }
 }

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   InternalServerErrorException,
@@ -16,6 +17,8 @@ import {
 } from 'utilities/functions';
 import { AddFieldDto } from './dto/add-field.dto';
 import { Consts } from 'utilities/constants';
+import { isUUID } from 'class-validator';
+import { UpdateFieldsDto } from './dto/update-fields.dto';
 
 @Injectable()
 export class FormService {
@@ -63,14 +66,30 @@ export class FormService {
   async findAll() {
     const forms = await this.prismaService.form.findMany({
       include: {
+        Project: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            description: true,
+            isActive: true,
+            isDeleted: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
         Field: {
+          where: {
+            isDeleted: false,
+          },
           select: {
             id: true,
             code: true,
             label: true,
             slug: true,
+            uuid: true,
             description: true,
-            optionnal: true,
+            optional: true,
             defaultValue: true,
             exampleValue: true,
             selectValues: true,
@@ -81,6 +100,15 @@ export class FormService {
                 value: true,
               },
             },
+            FieldRank: {
+              select: {
+                rank: true,
+              },
+              orderBy: {
+                rank: 'asc',
+              },
+              take: 1,
+            },
           },
         },
       },
@@ -90,6 +118,13 @@ export class FormService {
       orderBy: {
         createdAt: 'desc',
       },
+    });
+
+    // order fields by rank
+    forms.forEach((form) => {
+      form.Field = form.Field.sort(
+        (a, b) => a.FieldRank[0].rank - b.FieldRank[0].rank,
+      );
     });
 
     // Return the response
@@ -105,8 +140,131 @@ export class FormService {
         id,
         isDeleted: false,
       },
+      include: {
+        Project: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            description: true,
+            isActive: true,
+            isDeleted: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        Field: {
+          where: {
+            isDeleted: false,
+          },
+          select: {
+            id: true,
+            code: true,
+            label: true,
+            slug: true,
+            uuid: true,
+            description: true,
+            optional: true,
+            defaultValue: true,
+            exampleValue: true,
+            selectValues: true,
+            fieldType: {
+              select: {
+                id: true,
+                label: true,
+                value: true,
+              },
+            },
+            FieldRank: {
+              select: {
+                rank: true,
+              },
+              orderBy: {
+                rank: 'asc',
+              },
+              take: 1,
+            },
+          },
+        },
+      },
     });
     if (!form) throw new NotFoundException(translate('Formulaire non trouvé'));
+
+    // order fields by rank
+    form.Field = form.Field.sort(
+      (a, b) => a.FieldRank[0].rank - b.FieldRank[0].rank,
+    );
+
+    // Return the response
+    return {
+      message: translate('Détail du formulaire'),
+      data: form,
+    };
+  }
+
+  async findOneByUuid(uuid: string) {
+    if (!isUUID(uuid))
+      throw new BadRequestException(translate('UUID invalide'));
+
+    const form = await this.prismaService.form.findFirst({
+      where: {
+        uuid,
+        isDeleted: false,
+      },
+      include: {
+        Project: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            description: true,
+            isActive: true,
+            isDeleted: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        Field: {
+          where: {
+            isDeleted: false,
+          },
+          select: {
+            id: true,
+            code: true,
+            label: true,
+            slug: true,
+            uuid: true,
+            description: true,
+            optional: true,
+            defaultValue: true,
+            exampleValue: true,
+            selectValues: true,
+            fieldType: {
+              select: {
+                id: true,
+                label: true,
+                value: true,
+              },
+            },
+            FieldRank: {
+              select: {
+                rank: true,
+              },
+              orderBy: {
+                rank: 'asc',
+              },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+    if (!form) throw new NotFoundException(translate('Formulaire non trouvé'));
+
+    // order fields by rank
+    form.Field = form.Field.sort(
+      (a, b) => a.FieldRank[0].rank - b.FieldRank[0].rank,
+    );
 
     // Return the response
     return {
@@ -127,6 +285,18 @@ export class FormService {
     const formFields = await this.prismaService.field.findMany({
       where: {
         formId: id,
+        isDeleted: false,
+      },
+      include: {
+        FieldRank: {
+          select: {
+            rank: true,
+          },
+          orderBy: {
+            rank: 'asc',
+          },
+          take: 1,
+        },
       },
     });
 
@@ -144,8 +314,9 @@ export class FormService {
               fieldTypeId: field.fieldTypeId,
               label: field.label,
               slug: field.slug,
+              uuid: field.uuid,
               description: field.description,
-              optionnal: field.optionnal,
+              optional: field.optional,
               defaultValue: field.defaultValue,
               exampleValue: field.exampleValue,
               selectValues: field.selectValues,
@@ -158,6 +329,39 @@ export class FormService {
       throw new InternalServerErrorException(
         translate('Erreur lors de la duplication du formulaire'),
       );
+
+    // Give the permission to supervisor and sampler to manage the form
+    const profileValues = [Consts.SUPERVISOR_PROFILE, Consts.SAMPLER_PROFILE];
+    const profiles = await this.prismaService.profile.findMany({
+      where: {
+        value: {
+          in: profileValues,
+        },
+      },
+    });
+    await this.prismaService.formPermission.createMany({
+      data: profiles.map((profile) => ({
+        formId: newForm.id,
+        profileId: profile.id,
+      })),
+    });
+
+    // create field ranks
+    const fieldRanks = await Promise.all(
+      formFields.map(async (field) => {
+        const fieldRank = await this.prismaService.fieldRank.create({
+          data: {
+            fieldId: field.id,
+            rank: field.FieldRank[0].rank,
+          },
+        });
+        if (!fieldRank)
+          throw new InternalServerErrorException(
+            translate('Erreur lors de la création du rang du champ'),
+          );
+        return fieldRank;
+      }),
+    );
 
     // Return the response
     return {
@@ -205,9 +409,10 @@ export class FormService {
   async addField(id: number, addFieldDto: AddFieldDto, userAuthenticated: any) {
     const {
       fieldTypeId,
+      uuid,
       label,
       description,
-      optionnal,
+      optional,
       defaultValue,
       exampleValue,
       selectValues,
@@ -218,6 +423,17 @@ export class FormService {
       where: {
         id,
         isDeleted: false,
+      },
+      include: {
+        Field: {
+          where: {
+            isDeleted: false,
+          },
+          select: {
+            id: true,
+            slug: true,
+          },
+        },
       },
     });
     if (!form) throw new NotFoundException(translate('Formulaire non trouvé'));
@@ -243,6 +459,7 @@ export class FormService {
       where: {
         formId: id,
         slug,
+        isDeleted: false,
       },
     });
     if (slugExists)
@@ -258,8 +475,9 @@ export class FormService {
         fieldTypeId,
         label,
         slug: getSlug(label),
+        uuid,
         description,
-        optionnal,
+        optional,
         defaultValue,
         exampleValue,
         selectValues,
@@ -270,10 +488,198 @@ export class FormService {
         translate('Erreur lors de la création du champ'),
       );
 
+    // create field rank
+    const fieldRank = await this.prismaService.fieldRank.create({
+      data: {
+        fieldId: field.id,
+        rank: form.Field.length + 1,
+      },
+    });
+    if (!fieldRank)
+      throw new InternalServerErrorException(
+        translate('Erreur lors de la création du rang du champ'),
+      );
+
     // Return the response
     return {
       message: translate('Champ ajouté avec succès'),
       data: field,
+    };
+  }
+
+  async updateFields(
+    id: number,
+    updateFieldsDto: UpdateFieldsDto,
+    userAuthenticated: any,
+  ) {
+    const { fields } = updateFieldsDto;
+
+    // Check if the form exists
+    const form = await this.prismaService.form.findUnique({
+      where: {
+        id,
+        isDeleted: false,
+      },
+      include: {
+        Field: {
+          where: {
+            isDeleted: false,
+          },
+          include: {
+            fieldType: true,
+          },
+        },
+      },
+    });
+    if (!form) throw new NotFoundException(translate('Formulaire non trouvé'));
+
+    // remove all field ranks
+    await this.prismaService.fieldRank.deleteMany({
+      where: {
+        fieldId: {
+          in: form.Field.map((field) => field.id),
+        },
+      },
+    });
+
+    const mapRanks = fields.map((field, index) => ({
+      [field.uuid]: index + 1,
+    }));
+
+    // get les fields a maintenir
+    const fieldsToKeep = form.Field.filter((field) =>
+      fields.map((field) => field.uuid).includes(field.uuid),
+    );
+
+    // get les fields a supprimer
+    const fieldsToDelete = form.Field.filter(
+      (field) => !fields.map((field) => field.uuid).includes(field.uuid),
+    );
+
+    // get les fields a ajouter
+    const fieldsToAdd = fields.filter(
+      (field) => !form.Field.map((field) => field.uuid).includes(field.uuid),
+    );
+
+    // update les fields a maintenir
+    const updatedFields = await Promise.all(
+      fieldsToKeep.map(async (field) => {
+        const fieldToKeepData = fields.find((f) => f.uuid === field.uuid);
+        const updatedField = await this.prismaService.field.update({
+          where: {
+            id: field.id,
+          },
+          data: {
+            description: fieldToKeepData.description,
+            label: fieldToKeepData.label,
+            optional: fieldToKeepData.optional,
+            defaultValue: fieldToKeepData.defaultValue,
+            exampleValue: fieldToKeepData.exampleValue,
+            selectValues: fieldToKeepData.selectValues,
+            // fieldTypeId: fieldToKeepData.fieldTypeId,
+          },
+        });
+        if (!updatedField)
+          throw new InternalServerErrorException(
+            translate('Erreur lors de la mise à jour du champ'),
+          );
+        return updatedField;
+      }),
+    );
+
+    // delete les fields a supprimer
+    await Promise.all(
+      fieldsToDelete.map(async (field) => {
+        await this.prismaService.field.update({
+          where: {
+            id: field.id,
+          },
+          data: {
+            isDeleted: true,
+            deletedAt: new Date(),
+          },
+        });
+      }),
+    );
+
+    // add les fields a ajouter
+    const addedFields = await Promise.all(
+      fieldsToAdd.map(async (field) => {
+        const fieldType = await this.prismaService.fieldType.findUnique({
+          where: {
+            id: field.fieldTypeId,
+          },
+        });
+        if (!fieldType)
+          throw new NotFoundException(translate('Type de champ non trouvé'));
+
+        if (fieldType.value === 'select' && !field.selectValues)
+          throw new ConflictException(
+            translate(
+              'Veuillez fournir les valeurs de sélection separées par des virgules',
+            ),
+          );
+
+        const slug = getSlug(field.label);
+        const slugExists = await this.prismaService.field.findFirst({
+          where: {
+            formId: id,
+            slug,
+            isDeleted: false,
+          },
+        });
+        if (slugExists)
+          throw new ConflictException(
+            translate('Le champ existe déjà dans ce formulaire'),
+          );
+
+        const newField = await this.prismaService.field.create({
+          data: {
+            code: genFieldCode(),
+            formId: id,
+            fieldTypeId: field.fieldTypeId,
+            label: field.label,
+            slug,
+            uuid: field.uuid,
+            description: field.description,
+            optional: field.optional,
+            defaultValue: field.defaultValue,
+            exampleValue: field.exampleValue,
+            selectValues: field.selectValues,
+          },
+        });
+        if (!newField)
+          throw new InternalServerErrorException(
+            translate('Erreur lors de la création du champ'),
+          );
+
+        return newField;
+      }),
+    );
+
+    const allFields = [...updatedFields, ...addedFields];
+
+    // create field ranks
+    const fieldRanks = await Promise.all(
+      allFields.map(async (field) => {
+        const rank = mapRanks.find((mapRank) => mapRank[field.uuid]);
+        const fieldRank = await this.prismaService.fieldRank.create({
+          data: {
+            fieldId: field.id,
+            rank: rank[field.uuid],
+          },
+        });
+        if (!fieldRank)
+          throw new InternalServerErrorException(
+            translate('Erreur lors de la création du rang du champ'),
+          );
+        return fieldRank;
+      }),
+    );
+
+    // Return the response
+    return {
+      message: translate('Champs mis à jour avec succès'),
     };
   }
 
