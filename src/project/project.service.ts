@@ -405,7 +405,7 @@ export class ProjectService {
       });
     }
 
-    if (kpiValues) {
+    if (kpiValues && Object.keys(kpiValues).length > 0) {
       // Update KPI values to the project
 
       const kpis = await this.prismaService.kpi.findMany();
