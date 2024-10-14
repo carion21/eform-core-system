@@ -19,6 +19,5 @@ export class UpdateProjectDto {
     readonly teamids: number[];
 
     @IsObject()
-    @IsNotEmpty()
     readonly kpiValues: object;
 }
