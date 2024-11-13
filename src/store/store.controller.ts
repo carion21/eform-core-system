@@ -40,4 +40,28 @@ export class StoreController {
 
     return this.storeService.show(formUuid, userAuthenticated);
   }
+
+  @Get('list-session/:formUuid')
+  listSession(@Param('formUuid') formUuid: string, @Req() request: Request) {
+    let userAuthenticated = request['user'];
+    applyRbac(userAuthenticated, 'store_list_session');
+
+    return this.storeService.listSession(formUuid, userAuthenticated);
+  }
+
+  @Get('show-session/:formUuid/:sessionUuid')
+  showSession(
+    @Param('formUuid') formUuid: string,
+    @Param('sessionUuid') sessionUuid: string,
+    @Req() request: Request,
+  ) {
+    let userAuthenticated = request['user'];
+    applyRbac(userAuthenticated, 'store_show_session');
+
+    return this.storeService.showSession(
+      formUuid,
+      sessionUuid,
+      userAuthenticated,
+    );
+  }
 }

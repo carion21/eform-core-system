@@ -40,6 +40,33 @@ export class KpiController {
     return this.kpiService.findAll();
   }
 
+  @Get('objective')
+  findAllObjective(@Req() request: Request) {
+    let userAuthenticated = request['user'];
+    applyRbac(userAuthenticated, 'kpi_find_all');
+
+    return this.kpiService.findAllObjective();
+  }
+
+  @Get('result')
+  findAllResult(@Req() request: Request) {
+    let userAuthenticated = request['user'];
+    applyRbac(userAuthenticated, 'kpi_find_all');
+
+    return this.kpiService.findAllResult();
+  }
+
+  @Get('data/:projectId')
+  getData(
+    @Param('projectId') projectId: string,
+    @Req() request: Request,
+  ) {
+    let userAuthenticated = request['user'];
+    applyRbac(userAuthenticated, 'kpi_get_data');
+
+    return this.kpiService.getData(+projectId, userAuthenticated);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @Req() request: Request) {
     let userAuthenticated = request['user'];

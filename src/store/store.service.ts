@@ -8,6 +8,7 @@ import { SaveInStoreDto } from './dto/save-in-store.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { controlData, generateUuid, translate } from 'utilities/functions';
 import { Consts } from 'utilities/constants';
+import { create } from 'domain';
 
 @Injectable()
 export class StoreService {
@@ -103,9 +104,6 @@ export class StoreService {
       .filter((field) => !field.optional)
       .map((field) => field.slug);
 
-    console.log('requiredFields', requiredFields);
-    
-
     const mapSelectValues = {};
     fields.forEach((field) => {
       if (field.fieldType.value === 'select') {
@@ -142,83 +140,134 @@ export class StoreService {
     };
   }
 
-  async show(formUuid: string, userAuthenticated: any) {
-    // check if the form exists
+  async show(formUuid: string, userAuthenticated: any, sessionUuid?: string) {
+    // Récupérer le formulaire avec ses champs et vérifier son existence
     const form = await this.prismaService.form.findFirst({
-      where: {
-        uuid: formUuid,
-        isDeleted: false,
-      },
-      include: {
-        Field: {
-          include: {
-            fieldType: true,
-          },
-        },
-      },
+      where: { uuid: formUuid, isDeleted: false },
+      include: { Field: { include: { fieldType: true } } },
     });
     if (!form) throw new NotFoundException(translate('Formulaire introuvable'));
-
     if (!form.isActive)
       throw new ForbiddenException(translate('Formulaire désactivé'));
 
-    // check if the user has the right to show data in the form
-    if (
-      ![Consts.ADMIN_PROFILE, Consts.VIEWER_PROFILE].includes(
-        userAuthenticated['profile']['value'],
-      )
-    ) {
+    // Vérifier les permissions de l'utilisateur
+    const isAdminOrViewer = [
+      Consts.ADMIN_PROFILE,
+      Consts.VIEWER_PROFILE,
+    ].includes(userAuthenticated['profile']['value']);
+
+    if (!isAdminOrViewer) {
       const formPermission = await this.prismaService.formPermission.findFirst({
         where: {
           formId: form.id,
           profileId: userAuthenticated['profile']['id'],
+          isActive: true,
         },
       });
-      if (!formPermission || !formPermission.isActive)
+      if (!formPermission) {
         throw new ForbiddenException(
           translate(
             "Vous n'avez pas le droit de consulter les données de ce formulaire",
           ),
         );
+      }
     }
 
-    // Get the data from the store
-    const fields = form.Field;
+    // Récupérer les données en fonction des permissions et filtrer si sessionUuid est présent
     const dataRows = await this.prismaService.dataRow.findMany({
       where: {
-        fieldId: {
-          in: fields.map((field) => field.id),
-        },
+        fieldId: { in: form.Field.map((field) => field.id) },
+        ...(isAdminOrViewer ? {} : { userId: userAuthenticated['id'] }),
+        ...(sessionUuid ? { sessionUuid } : {}),
       },
       select: {
         sessionUuid: true,
         fieldId: true,
         value: true,
+        createdAt: true,
       },
     });
 
-    const sessionUuids = dataRows.map((dataRow) => dataRow.sessionUuid);
-    let data = {};
-    sessionUuids.forEach((sessionUuid) => {
-      const rows = dataRows.filter(
-        (dataRow) => dataRow.sessionUuid === sessionUuid,
-      );
-      data[sessionUuid] = {};
-      rows.forEach((row) => {
-        const field = fields.find((field) => field.id === row.fieldId);
-        // with slug
-        // data[sessionUuid][field.slug] = row.value;
-        // with label
-        data[sessionUuid][field.label] = row.value;
-      });
-    });
-    const dataWithSessionUuid = data;
-    const dataWithoutSessionUuid = Object.values(dataWithSessionUuid);
+    // Organiser les données par sessionUuid
+    const data = dataRows.reduce((acc, row) => {
+      const field = form.Field.find((f) => f.id === row.fieldId);
+      if (field) {
+        if (!acc[row.sessionUuid]) acc[row.sessionUuid] = {};
+        acc[row.sessionUuid][field.label] = row.value;
+        acc[row.sessionUuid]['slug_' + field.slug] = row.value;
+        acc[row.sessionUuid]['createdAt'] = row.createdAt;
+      }
+      return acc;
+    }, {});
 
-    // Return the response
+    // Préparer les données pour la réponse
+    const dataWithoutSessionUuid = Object.values(data);
+
     return {
       message: translate('Données récupérées avec succès'),
       data: dataWithoutSessionUuid,
     };
+  }
+
+  async listSession(formUuid: string, userAuthenticated: any) {
+    // Vérifier l'existence du formulaire et récupérer les champs associés
+    const form = await this.prismaService.form.findFirst({
+      where: { uuid: formUuid, isDeleted: false },
+      include: { Field: { select: { id: true } } },
+    });
+    if (!form) throw new NotFoundException(translate('Formulaire introuvable'));
+
+    // Vérifier les permissions de l'utilisateur
+    const isAdminOrViewer = [
+      Consts.ADMIN_PROFILE,
+      Consts.VIEWER_PROFILE,
+    ].includes(userAuthenticated['profile']['value']);
+
+    if (!isAdminOrViewer) {
+      const formPermission = await this.prismaService.formPermission.findFirst({
+        where: {
+          formId: form.id,
+          profileId: userAuthenticated['profile']['id'],
+          isActive: true,
+        },
+      });
+      if (!formPermission) {
+        throw new ForbiddenException(
+          translate(
+            "Vous n'avez pas le droit de consulter les données de ce formulaire",
+          ),
+        );
+      }
+    }
+
+    // Récupérer les sessions avec UUID et date de création en fonction des permissions
+    const dataRows = await this.prismaService.dataRow.findMany({
+      where: {
+        fieldId: { in: form.Field.map((field) => field.id) },
+        ...(isAdminOrViewer ? {} : { userId: userAuthenticated['id'] }),
+      },
+      select: {
+        sessionUuid: true,
+        createdAt: true,
+      },
+      distinct: ['sessionUuid'],
+    });
+
+    // Ajouter formUuid à chaque session pour la réponse et ordonner par date de création desc
+    const sessions = dataRows.map(({ sessionUuid, createdAt }) => ({
+      formUuid,
+      sessionUuid,
+      createdAt,
+    })).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    // Retourner la réponse
+    return {
+      message: translate('Sessions récupérées avec succès'),
+      data: sessions,
+    };
+  }
+
+  async showSession(formUuid: string, sessionUuid: string, userAuthenticated: any) {
+    return await this.show(formUuid, userAuthenticated, sessionUuid);
   }
 }

@@ -16,15 +16,15 @@ const configService = new ConfigService();
 async function main() {
   const kpiDatas = Consts.DEFAULT_KPIS.map((kpi) => {
     return {
-      name: kpi,
-      slug: getSlug(kpi),
+      name: kpi['name'],
+      slug: getSlug(kpi['name']),
+      type: kpi['type'],
     };
   });
   await prisma.kpi.createMany({
     data: kpiDatas,
   });
   console.log('KPIs created');
-  
 
   const fieldTypeDatas = Consts.DEFAULT_FIELD_TYPES.map((ftype) => {
     return {

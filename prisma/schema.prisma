@@ -67,6 +67,8 @@ model Kpi {
   id           Int            @id @default(autoincrement())
   name         String         @db.VarChar(255)
   slug         String         @db.VarChar(255)
+  type         String         @db.VarChar(255)
+  description  String?         @db.Text
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   KpiByTeam    KpiByTeam[]
@@ -78,7 +80,7 @@ model KpiByTeam {
   teamId    Int
   kpiId     Int
   projectId Int
-  value     Int
+  value     Float
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   team      Team     @relation(fields: [teamId], references: [id])
@@ -114,7 +116,7 @@ model KpiByProject {
   id        Int      @id @default(autoincrement())
   projectId Int
   kpiId     Int
-  value     Int
+  value     Float
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   project   Project  @relation(fields: [projectId], references: [id])

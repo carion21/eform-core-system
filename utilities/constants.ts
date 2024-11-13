@@ -51,11 +51,55 @@ export class Consts {
     },
   ];
 
-  static DEFAULT_KPIS: string[] = [
-    'Points de vente visités',
-    'Nombre de clients visités',
-    'Nombre de casiers vendus',
-    'Nombre de bouteilles distribuées',
+  static KPI_TYPE_OBJECTIVE: string = 'objective';
+  static KPI_TYPE_RESULT: string = 'result';
+
+  static KPI_TYPES: string[] = [
+    "objective",
+    "result"
+  ];
+
+  static DEFAULT_KPIS: object[] = [
+    {
+      name: 'Nombre de PDV à atteindre',
+      type: 'objective',
+    },
+    {
+      name: 'Nombre de personnes à toucher',
+      type: 'objective',
+    },
+    {
+      name: 'Nombre de casiers mis à la disposition ',
+      type: 'objective',
+    },
+    {
+      name: 'Nombre de bouteilles reçues',
+      type: 'objective',
+    },
+    {
+      name: 'Nombre de PDV réalisés',
+      type: 'result',
+    },
+    {
+      name: 'Nombre de casiers utilisés',
+      type: 'result',
+    },
+    {
+      name: 'Nombre de casiers restants',
+      type: 'result',
+    },
+    {
+      name: 'Nombre de casiers vendus',
+      type: 'result',
+    },
+    {
+      name: 'Nombre de bouteilles vendues',
+      type: 'result',
+    },
+    {
+      name: 'Nombre de PDV non référencés par la boisson',
+      type: 'result',
+    },
   ];
 
   static DEFAULT_KPI_VALUE_TYPE: string = 'number';
@@ -157,6 +201,9 @@ export class Consts {
       'form_update_fields',
       'form_duplicate',
       'store_show',
+      'store_list_session',
+      'store_show_session',
+      'kpi_get_data'
     ],
     supervisor: [
       'change_password',
@@ -164,10 +211,13 @@ export class Consts {
       'field_type_find_all',
       'store_save',
       'store_show',
+      'store_list_session',
+      'store_show_session',
       'kpi_find_all',
       'project_find_one',
       'project_fill_kpi',
       'form_find_one',
+      'kpi_get_data',
     ],
     sampler: [
       'change_password',
@@ -175,6 +225,8 @@ export class Consts {
       'field_type_find_all',
       'store_save',
       'store_show',
+      'store_list_session',
+      'store_show_session',
       'form_find_one',
     ],
     viewer: ['change_password', 'user_find_me'],

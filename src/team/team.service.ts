@@ -7,6 +7,7 @@ import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { genTeamCode, translate } from 'utilities/functions';
+import { Consts } from 'utilities/constants';
 
 @Injectable()
 export class TeamService {
@@ -173,9 +174,9 @@ export class TeamService {
                 name: true,
                 slug: true,
               },
-            }
-          }
-        }
+            },
+          },
+        },
       },
       where: {
         id: {

@@ -79,7 +79,11 @@ export class ProjectService {
     }
 
     // Add KPI values to the project
-    const kpis = await this.prismaService.kpi.findMany();
+    const kpis = await this.prismaService.kpi.findMany({
+      where: {
+        type: Consts.KPI_TYPE_OBJECTIVE,
+      },
+    });
 
     let mapFieldTypes = {};
     kpis.forEach((kpi) => {
@@ -107,7 +111,7 @@ export class ProjectService {
       data: kpis.map((kpi) => ({
         projectId: project.id,
         kpiId: kpi.id,
-        value: parseInt(kpiValues[kpi.slug]),
+        value: parseFloat(kpiValues[kpi.slug]),
       })),
     });
 
@@ -195,7 +199,33 @@ export class ProjectService {
         },
         ProjectTeam: {
           include: {
-            team: true,
+            team: {
+              select: {
+                code: true,
+                name: true,
+                isActive: true,
+                isDeleted: true,
+                TeamUser: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        email: true,
+                        firstname: true,
+                        lastname: true,
+                        phone: true,
+                        profile: {
+                          select: {
+                            label: true,
+                            value: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -205,6 +235,50 @@ export class ProjectService {
       },
     });
     if (!project) throw new NotFoundException(translate('Projet introuvable'));
+
+    // get teams with isDeleted = false
+    const teams = project.ProjectTeam.map((pt) => pt.team).filter(
+      (team) => !team.isDeleted,
+    );
+    // put team users in team
+    teams.forEach(async (team) => {
+      // count dataRows with memberIds
+      team['dataRowsCount'] = 0;
+      const countDataRows = await this.prismaService.dataRow.count({
+        where: {
+          userId: {
+            in: team.TeamUser.map((tu) => tu.userId),
+          },
+        },
+      });
+      team['dataRowsCount'] = countDataRows;
+
+      team['members'] = team.TeamUser.map((tu) => tu.user);
+
+      Reflect.deleteProperty(team, 'isDeleted');
+      Reflect.deleteProperty(team, 'TeamUser');
+    });
+    Reflect.deleteProperty(project, 'ProjectTeam');
+    project['teams'] = teams;
+
+    // get kpi values
+    const kpisByProject = await this.prismaService.kpiByProject.findMany({
+      where: {
+        projectId: id,
+        kpi: {
+          type: Consts.KPI_TYPE_OBJECTIVE,
+        },
+      },
+      include: {
+        kpi: true,
+      },
+    });
+
+    let kpiValues = {};
+    kpisByProject.forEach((kpiByProject) => {
+      kpiValues[kpiByProject.kpi.slug] = kpiByProject.value;
+    });
+    project['kpiValues'] = kpiValues;
 
     // Return the response
     return {
@@ -257,7 +331,11 @@ export class ProjectService {
     if (!project) throw new NotFoundException(translate('Projet introuvable'));
 
     // control kpiDatas
-    const kpis = await this.prismaService.kpi.findMany();
+    const kpis = await this.prismaService.kpi.findMany({
+      where: {
+        type: Consts.KPI_TYPE_RESULT,
+      },
+    });
 
     let mapFieldTypes = {};
     kpis.forEach((kpi) => {
@@ -301,14 +379,16 @@ export class ProjectService {
     });
     if (!team)
       throw new NotFoundException(
-        translate('Vous ne pouvez pas remplir ces KPIs| Equipe introuvable ou non autorisée'),
+        translate(
+          'Vous ne pouvez pas remplir ces KPIs| Equipe introuvable ou non autorisée',
+        ),
       );
 
     // Remove all KPI values from the project
     await this.prismaService.kpiByTeam.deleteMany({
       where: {
         projectId: id,
-        teamId: team.teamId, 
+        teamId: team.teamId,
       },
     });
     // Re-create all KPI values to the project
