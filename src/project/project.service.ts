@@ -201,6 +201,7 @@ export class ProjectService {
           include: {
             team: {
               select: {
+                id: true,
                 code: true,
                 name: true,
                 isActive: true,
