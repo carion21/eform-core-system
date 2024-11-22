@@ -317,12 +317,12 @@ export class ProjectService {
     kpisByProject.forEach((kpiByProject) => {
       kpiObjectivesValues[kpiByProject.kpi.slug] = kpiByProject.value;
     });
-    project['kpiObjectivesValues'] = kpiObjectivesValues;
+    project['kpiValues'] = kpiObjectivesValues;
 
     // get kpi results values
     let kpiResultsValues = {};
     kpiResultsValues = sumListKpiValues(teams.map((team) => team['kpiValues']));
-    project['kpiResultsValues'] = kpiResultsValues;
+    project['kpiResults'] = kpiResultsValues;
 
     // Return the response
     return {
