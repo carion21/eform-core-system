@@ -280,11 +280,19 @@ const controlFieldType = (
       }
       break;
     case 'select':
-      if (isString(value) && isNotEmpty(value) && select_values.includes(value)) {
+      if (
+        isString(value) &&
+        isNotEmpty(value) &&
+        select_values.includes(value)
+      ) {
         result.success = true;
       }
       if (!result.success) {
-        error = 'the field ' + field + ' must be a string between +=> ' + select_values.join(', ');
+        error =
+          'the field ' +
+          field +
+          ' must be a string between +=> ' +
+          select_values.join(', ');
       }
       break;
     default:
@@ -298,6 +306,15 @@ const controlFieldType = (
 
   return result;
 };
+
+function sumListKpiValues(listOfkpiValues: object[]): object {
+  return listOfkpiValues.reduce((sum, kpiValues) => {
+    for (const [cle, valeur] of Object.entries(kpiValues)) {
+      sum[cle] = (sum[cle] || 0) + valeur;
+    }
+    return sum;
+  }, {});
+}
 
 export {
   getSlug,
@@ -316,4 +333,5 @@ export {
   applyRbac,
   controlData,
   controlFieldType,
+  sumListKpiValues
 };

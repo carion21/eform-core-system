@@ -7,7 +7,7 @@ import {
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { controlData, genProjectCode, translate } from 'utilities/functions';
+import { controlData, genProjectCode, sumListKpiValues, translate } from 'utilities/functions';
 import { AddTeamDto } from './dto/add-team.dto';
 import { Consts } from 'utilities/constants';
 import { parse } from 'path';
@@ -237,6 +237,15 @@ export class ProjectService {
     });
     if (!project) throw new NotFoundException(translate('Projet introuvable'));
 
+    const kpiResults = await this.prismaService.kpi.findMany({
+      where: {
+        type: Consts.KPI_TYPE_RESULT,
+      },
+    });
+    const kpiResultsIds = kpiResults.map((kpi) => kpi.id);
+    console.log('kpiResultsIds', kpiResultsIds);
+    
+
     // get teams with isDeleted = false
     const teams = project.ProjectTeam.map((pt) => pt.team).filter(
       (team) => !team.isDeleted,
@@ -244,15 +253,44 @@ export class ProjectService {
     // put team users in team
     teams.forEach(async (team) => {
       // count dataRows with memberIds
+      console.log('=====================');
+      console.log('team', team.id);
+      
       team['dataRowsCount'] = 0;
+      const userIds = team.TeamUser.map((tu) => tu.userId);
       const countDataRows = await this.prismaService.dataRow.count({
         where: {
           userId: {
-            in: team.TeamUser.map((tu) => tu.userId),
+            in: userIds,
           },
         },
       });
       team['dataRowsCount'] = countDataRows;
+
+      // put kpi values in team
+
+      let kpisByTeam = await this.prismaService.kpiByTeam.findMany({
+        where: {
+          projectId: id,
+          teamId: team.id,
+          kpiId: {
+            in: kpiResultsIds,
+          },
+        },
+        include: {
+          kpi: true,
+        },
+      });
+      let kpiValues = {};
+      kpiResults.forEach((kpi) => {
+        kpiValues[kpi.slug] = 0;
+        // find kpi value
+        const kpiByTeam = kpisByTeam.find((kbt) => kbt.kpiId === kpi.id);
+        if (kpiByTeam) kpiValues[kpi.slug] = kpiByTeam.value;
+      });
+      console.log('kpiValues of team', team.id, kpiValues);
+      
+      team['kpiValues'] = kpiValues;
 
       team['members'] = team.TeamUser.map((tu) => tu.user);
 
@@ -274,12 +312,17 @@ export class ProjectService {
         kpi: true,
       },
     });
-
-    let kpiValues = {};
+    // put kpi values in project
+    let kpiObjectivesValues = {};
     kpisByProject.forEach((kpiByProject) => {
-      kpiValues[kpiByProject.kpi.slug] = kpiByProject.value;
+      kpiObjectivesValues[kpiByProject.kpi.slug] = kpiByProject.value;
     });
-    project['kpiValues'] = kpiValues;
+    project['kpiObjectivesValues'] = kpiObjectivesValues;
+
+    // get kpi results values
+    let kpiResultsValues = {};
+    kpiResultsValues = sumListKpiValues(teams.map((team) => team['kpiValues']));
+    project['kpiResultsValues'] = kpiResultsValues;
 
     // Return the response
     return {

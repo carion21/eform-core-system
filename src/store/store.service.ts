@@ -185,6 +185,20 @@ export class StoreService {
         fieldId: true,
         value: true,
         createdAt: true,
+        user: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            isActive: true,
+            profile: {
+              select: {
+                label: true,
+                value: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -196,6 +210,7 @@ export class StoreService {
         acc[row.sessionUuid][field.label] = row.value;
         acc[row.sessionUuid]['slug_' + field.slug] = row.value;
         acc[row.sessionUuid]['createdAt'] = row.createdAt;
+        acc[row.sessionUuid]['user'] = row.user;
       }
       return acc;
     }, {});
@@ -254,11 +269,13 @@ export class StoreService {
     });
 
     // Ajouter formUuid à chaque session pour la réponse et ordonner par date de création desc
-    const sessions = dataRows.map(({ sessionUuid, createdAt }) => ({
-      formUuid,
-      sessionUuid,
-      createdAt,
-    })).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const sessions = dataRows
+      .map(({ sessionUuid, createdAt }) => ({
+        formUuid,
+        sessionUuid,
+        createdAt,
+      }))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     // Retourner la réponse
     return {
@@ -267,7 +284,11 @@ export class StoreService {
     };
   }
 
-  async showSession(formUuid: string, sessionUuid: string, userAuthenticated: any) {
+  async showSession(
+    formUuid: string,
+    sessionUuid: string,
+    userAuthenticated: any,
+  ) {
     return await this.show(formUuid, userAuthenticated, sessionUuid);
   }
 }
