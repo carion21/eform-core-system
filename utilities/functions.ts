@@ -308,12 +308,16 @@ const controlFieldType = (
 };
 
 function sumListKpiValues(listOfkpiValues: object[]): object {
-  return listOfkpiValues.reduce((sum, kpiValues) => {
-    for (const [cle, valeur] of Object.entries(kpiValues)) {
-      sum[cle] = (sum[cle] || 0) + valeur;
-    }
-    return sum;
-  }, {});
+  try {
+    return listOfkpiValues.reduce((sum, kpiValues) => {
+      for (const [cle, valeur] of Object.entries(kpiValues)) {
+        sum[cle] = (sum[cle] || 0) + valeur;
+      }
+      return sum;
+    }, {});
+  } catch (err) {
+    return {};
+  }
 }
 
 export {

@@ -7,12 +7,7 @@ import {
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import {
-  controlData,
-  genProjectCode,
-  sumListKpiValues,
-  translate,
-} from 'utilities/functions';
+import { controlData, genProjectCode, sumListKpiValues, translate } from 'utilities/functions';
 import { AddTeamDto } from './dto/add-team.dto';
 import { Consts } from 'utilities/constants';
 import { parse } from 'path';
@@ -176,7 +171,6 @@ export class ProjectService {
   }
 
   async findOne(id: number) {
-    // Récupérer le projet avec ses entités associées
     const project = await this.prismaService.project.findUnique({
       include: {
         form: {
@@ -241,73 +235,72 @@ export class ProjectService {
         isDeleted: false,
       },
     });
-
     if (!project) throw new NotFoundException(translate('Projet introuvable'));
 
-    // Récupérer les KPI de type RESULT
     const kpiResults = await this.prismaService.kpi.findMany({
       where: {
         type: Consts.KPI_TYPE_RESULT,
       },
     });
-
     const kpiResultsIds = kpiResults.map((kpi) => kpi.id);
+    console.log('kpiResultsIds', kpiResultsIds);
+    
 
-    // Récupérer les équipes non supprimées
+    // get teams with isDeleted = false
     const teams = project.ProjectTeam.map((pt) => pt.team).filter(
       (team) => !team.isDeleted,
     );
-
-    // Traiter les équipes de manière parallèle avec Promise.all
-    await Promise.all(
-      teams.map(async (team) => {
-        // Ajouter les comptages de dataRows
-        const userIds = team.TeamUser.map((tu) => tu.userId);
-        const countDataRows = await this.prismaService.dataRow.count({
-          where: {
-            userId: {
-              in: userIds,
-            },
+    // put team users in team
+    teams.forEach(async (team) => {
+      // count dataRows with memberIds
+      console.log('=====================');
+      console.log('team', team.id);
+      
+      team['dataRowsCount'] = 0;
+      const userIds = team.TeamUser.map((tu) => tu.userId);
+      const countDataRows = await this.prismaService.dataRow.count({
+        where: {
+          userId: {
+            in: userIds,
           },
-        });
-        team['dataRowsCount'] = countDataRows;
+        },
+      });
+      team['dataRowsCount'] = countDataRows;
 
-        // Récupérer les KPI par équipe
-        const kpisByTeam = await this.prismaService.kpiByTeam.findMany({
-          where: {
-            projectId: id,
-            teamId: team.id,
-            kpiId: {
-              in: kpiResultsIds,
-            },
+      // put kpi values in team
+
+      let kpisByTeam = await this.prismaService.kpiByTeam.findMany({
+        where: {
+          projectId: id,
+          teamId: team.id,
+          kpiId: {
+            in: kpiResultsIds,
           },
-          include: {
-            kpi: true,
-          },
-        });
+        },
+        include: {
+          kpi: true,
+        },
+      });
+      let kpiValues = {};
+      kpiResults.forEach((kpi) => {
+        kpiValues[kpi.slug] = 0;
+        // find kpi value
+        const kpiByTeam = kpisByTeam.find((kbt) => kbt.kpiId === kpi.id);
+        if (kpiByTeam) kpiValues[kpi.slug] = kpiByTeam.value;
+      });
+      console.log('kpiValues of team', team.id, kpiValues);
+      
+      team['kpiValues'] = kpiValues;
 
-        // Ajouter les valeurs des KPI pour l'équipe
-        let kpiValues = {};
-        kpiResults.forEach((kpi) => {
-          kpiValues[kpi.slug] = 0;
-          const kpiByTeam = kpisByTeam.find((kbt) => kbt.kpiId === kpi.id);
-          if (kpiByTeam) kpiValues[kpi.slug] = kpiByTeam.value;
-        });
+      team['members'] = team.TeamUser.map((tu) => tu.user);
 
-        team['kpiValues'] = kpiValues;
-        team['members'] = team.TeamUser.map((tu) => tu.user);
-
-        // Supprimer les propriétés inutiles
-        Reflect.deleteProperty(team, 'isDeleted');
-        Reflect.deleteProperty(team, 'TeamUser');
-      }),
-    );
-
-    // Supprimer les propriétés inutiles de project
+      Reflect.deleteProperty(team, 'isDeleted');
+      Reflect.deleteProperty(team, 'TeamUser');
+    });
     Reflect.deleteProperty(project, 'ProjectTeam');
     project['teams'] = teams;
 
-    // Récupérer les KPI de type OBJECTIVE pour le projet
+    // get kpi values
     const kpisByProject = await this.prismaService.kpiByProject.findMany({
       where: {
         projectId: id,
@@ -319,21 +312,24 @@ export class ProjectService {
         kpi: true,
       },
     });
-
-    // Ajouter les valeurs des KPI pour le projet
+    // put kpi values in project
     let kpiObjectivesValues = {};
     kpisByProject.forEach((kpiByProject) => {
       kpiObjectivesValues[kpiByProject.kpi.slug] = kpiByProject.value;
     });
     project['kpiValues'] = kpiObjectivesValues;
 
-    // Calculer les valeurs des KPI des résultats pour le projet
-    let kpiResultsValues = sumListKpiValues(
-      teams.map((team) => team['kpiValues']),
-    );
+    // get kpi results values
+    let kpiResultsValues = {};
+    console.log("***");
+    
+    console.log(teams.map((team) => team['kpiValues']));
+    console.log("***");
+    
+    kpiResultsValues = sumListKpiValues(teams.map((team) => team['kpiValues']));
     project['kpiResults'] = kpiResultsValues;
 
-    // Retourner la réponse
+    // Return the response
     return {
       message: translate('Détails du projet'),
       data: project,
