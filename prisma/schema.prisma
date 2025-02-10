@@ -35,6 +35,7 @@ model User {
   password         String             @db.Text
   isActive         Boolean            @default(true)
   isDeleted        Boolean            @default(false)
+  isNeedChangePass Boolean            @default(false)
   profilePicture   String?            @db.Text
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
@@ -68,7 +69,7 @@ model Kpi {
   name         String         @db.VarChar(255)
   slug         String         @db.VarChar(255)
   type         String         @db.VarChar(255)
-  description  String?         @db.Text
+  description  String?        @db.Text
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   KpiByTeam    KpiByTeam[]

@@ -12,7 +12,13 @@ import { SignInDto } from './dto/sign-in.dto';
 
 import * as bcrypt from 'bcrypt';
 import * as moment from 'moment';
-import { generatePassword, getUiAvatar, translate } from 'utilities/functions';
+import {
+  generatePassword,
+  getUiAvatar,
+  isValidPassword,
+  listmonkSendEmail,
+  translate,
+} from 'utilities/functions';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 
@@ -40,7 +46,8 @@ export class AuthService {
 
     // Verify if the password is correct
     const match = await bcrypt.compare(password, user.password);
-    if (!match) throw new UnauthorizedException(translate('Mot de passe incorrect'));
+    if (!match)
+      throw new UnauthorizedException(translate('Mot de passe incorrect'));
     // generate ui avatar if profile picture is not available
     if (!user.profilePicture) user.profilePicture = getUiAvatar(user);
     // Generate the JWT
@@ -81,9 +88,16 @@ export class AuthService {
   ) {
     const { oldPassword, newPassword } = changePasswordDto;
     // password must be different from the old password and must be at least 8 characters
-    if (newPassword.length < 8)
+    // if (newPassword.length < 8)
+    if (!isValidPassword(newPassword))
       throw new BadRequestException(
-        translate('Le mot de passe doit contenir au moins 8 caractères'),
+        translate(
+          'Le mot de passe doit contenir au moins 8 caractères, au moins deux chiffres, aucun caractère spécial et aucune espace',
+        ),
+      );
+    if (oldPassword === newPassword)
+      throw new BadRequestException(
+        translate("Le nouveau mot de passe doit être différent de l'ancien"),
       );
     // retrieve the user
     const user = await this.prismaService.user.findUnique({
@@ -98,7 +112,8 @@ export class AuthService {
 
     // Verify if the old password is correct
     const match = await bcrypt.compare(oldPassword, user.password);
-    if (!match) throw new UnauthorizedException(translate('Mot de passe incorrect'));
+    if (!match)
+      throw new UnauthorizedException(translate('Mot de passe incorrect'));
 
     // hash the new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -112,12 +127,26 @@ export class AuthService {
       },
       data: {
         password: hashedPassword,
+        isNeedChangePass: false,
       },
     });
     if (!updatedUser)
       throw new InternalServerErrorException(
         translate("Erreur lors de la mise à jour de l'utilisateur"),
       );
+
+    // send email
+    const emailTemplateId = 5;
+    const emailData = {
+      login_url: this.configService.get('BUILDER_BASE_URL') + '/security/login',
+    };
+    const listmonkEmail = await listmonkSendEmail(
+      user,
+      emailTemplateId,
+      emailData,
+    );
+    console.log('listmonkEmail', listmonkEmail);
+
     // Return the response
     return {
       message: translate('Mot de passe modifié avec succès'),

@@ -36,5 +36,5 @@ lerna-debug.log*
 
 # Environment
 .env
-.env.prod
+.env.*
 main.py

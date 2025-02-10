@@ -7,19 +7,24 @@ import {
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { genUserCode, getUiAvatar, translate } from 'utilities/functions';
+import { generatePassword, genUserCode, getUiAvatar, listmonkSendEmail, translate } from 'utilities/functions';
 
 import * as bcrypt from 'bcrypt';
 import * as moment from 'moment';
 import { UpdatePasswordDto } from './dto/update-password.dto';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async create(createUserDto: CreateUserDto, userAuthenticated: object) {
-    const { role, lastname, firstname, email, phone, password } = createUserDto;
+    const { role, lastname, firstname, email, phone } = createUserDto;
 
+    const tempPassword = generatePassword();
     const emailExists = await this.prismaService.user.findFirst({
       where: {
         email,
@@ -35,7 +40,7 @@ export class UserService {
     });
     if (!profile) throw new NotFoundException(translate('Profil non trouvé'));
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
     const user = await this.prismaService.user.create({
       data: {
         code: genUserCode(),
@@ -45,12 +50,28 @@ export class UserService {
         email,
         phone,
         password: hashedPassword,
+        isNeedChangePass: true,
       },
     });
     if (!user)
       throw new InternalServerErrorException(
         translate("Erreur lors de la création de l'utilisateur"),
       );
+
+    // send email
+    const emailTemplateId = 4;
+    const emailData = {
+      email: user.email,
+      profile: profile.label.toUpperCase(),
+      temp_password: tempPassword,
+      login_url: this.configService.get('BUILDER_BASE_URL') + '/security/login',
+    };
+    const listmonkEmail = await listmonkSendEmail(
+      user,
+      emailTemplateId,
+      emailData,
+    );
+    console.log('listmonkEmail', listmonkEmail);
 
     Reflect.deleteProperty(user, 'password');
     // Return the response
